@@ -30,5 +30,4 @@ jobs:
         run: node scripts/check-release.mjs
       - run: npm run build
       - run: npm run test:packages
-      - run: npm publish --workspace @weavour/editor --access public --provenance
-      - run: npm publish --workspace @weavour/react --access public --provenance
+      - run: node scripts/publish.mjs

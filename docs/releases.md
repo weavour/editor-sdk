@@ -16,7 +16,9 @@ Subsequent tag releases use OIDC, not a stored npm token.
    the changelog and lockfile, and verify compatibility with the hosted iframe.
 3. Commit and tag `v<version>`; push the commit and tag. The release workflow runs
    the Test workflow before publishing both packages with provenance. Versions
-   must match the tag. Tags are immutable and never reused to fix a release.
+   must match the tag. Already-published bootstrap packages are skipped only when
+   their registry integrity matches the current build. Tags are immutable and
+   never reused to fix a release.
 4. In the private repository, pin the published version and run private integration
    checks for drafts, templates, uploads, AI, timers, demo and dashboard previews.
 5. Deploy additive iframe support before enabling a new SDK. Promote `/editor.js`
