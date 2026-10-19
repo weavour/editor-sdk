@@ -1,0 +1,16 @@
+name: Bug report
+description: Report an SDK integration issue.
+body:
+  - type: input
+    id: version
+    attributes:
+      label: SDK version and framework/browser
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction and expected behavior
+      description: Remove real user data, credentials and private documents.
+    validations:
+      required: true

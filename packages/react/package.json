@@ -1,0 +1,38 @@
+{
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/weavour/editor-sdk.git"
+  },
+  "homepage": "https://github.com/weavour/editor-sdk#readme",
+  "bugs": "https://github.com/weavour/editor-sdk/issues",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "name": "@weavour/react",
+  "description": "React bindings for the hosted Weavour email editor.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@weavour/editor": "0.1.0"
+  },
+  "peerDependencies": {
+    "react": "^18.3.1 || ^19.0.0"
+  }
+}

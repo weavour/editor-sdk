@@ -1,0 +1,9 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>SDK integration fixture</title>
+<input id="before" aria-label="Before editor"><div id="editor" style="height: 480px"></div><input id="after" aria-label="After editor">
+<script type="module">
+import { mount } from '/packages/editor/dist/index.js';
+window.mountEditor = (options = {}) => {
+  window.instance = mount('#editor', { editorKey: 'ek_test', userId: 'user', organizationId: 'org', editorUrl: location.origin + '/tests/fixtures/frame.html', apiUrl: location.origin, ...options });
+  return window.instance.ready;
+};
+</script></html>

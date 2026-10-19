@@ -1,0 +1,20 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Mock hosted editor</title>
+<input id="edit" aria-label="Edit email"><script>
+let config;
+const origin = new URL(location.href).searchParams.get('parentOrigin');
+function send(message) { parent.postMessage({ version: 1, sessionId: config.sdkSessionId, ...message }, origin); }
+window.addEventListener('message', event => {
+  if (event.origin !== origin || event.source !== parent) return;
+  const m = event.data;
+  if (m.type === 'weavour:init') {
+    config = m.config; window.config = config;
+    send({ type: 'weavour:ready', capabilities: { applicationReady: true } });
+    send({ type: 'weavour:application-ready' }); send({ type: 'weavour:autosave-ready' });
+  }
+  if (m.type === 'weavour:update-config') { config = { ...config, ...m.config }; window.config = config; }
+  if (m.type === 'weavour:export') send({ type: 'weavour:export-result', id: m.id, result: { html: '<p>Hello</p>', text: 'Hello', document: { type: 'doc' }, subject: 'Subject', preheader: 'Preview', mergeTags: [], mergeTagIssues: [] } });
+  if (m.type === 'weavour:flush') send({ type: 'weavour:flush-result', id: m.id, result: { draft: null } });
+  if (m.type === 'weavour:template-result') window.templateResult = m;
+});
+window.send = send;
+</script></html>

@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Weavour JavaScript integration</title></head>
+<body><div id="editor" style="height: 90vh; min-height: 480px"></div>
+<script src="../../packages/editor/dist/editor.js"></script>
+<script>
+const editor = Weavour.mount('#editor', {
+  editorKey: 'YOUR_PUBLIC_EDITOR_KEY', userId: 'example-user', organizationId: 'example-organization',
+  onDocumentChange(email) { console.log('Versioned email', email); },
+  onReady() { console.log('Editor ready'); }, onError: console.error,
+});
+window.addEventListener('pagehide', () => editor.destroy(), { once: true });
+</script></body></html>
