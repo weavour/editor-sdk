@@ -18,8 +18,10 @@ the trust relationship without publishing another package version. The workflow
 never persists or prints the exchanged credentials.
 
 1. Run `npm ci`, `npm run verify`, and `npm run test:browser`.
-2. Update both package versions and React's exact core dependency together, update
-   the changelog and lockfile, and verify compatibility with the hosted iframe.
+2. Run `npm run version:sdk -- 0.1.1` (substitute the next version, without `v`).
+   This updates both package versions, React's exact core dependency and all
+   lockfiles; it does not create a commit or tag. Update the changelog and verify
+   compatibility with the hosted iframe. A Git tag alone never bumps npm versions.
 3. Commit and tag `v<version>`; push the commit and tag. The release workflow runs
    the Test workflow before publishing both packages with provenance. Versions
    must match the tag. Already-published bootstrap packages are skipped only when

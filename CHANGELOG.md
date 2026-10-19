@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+
+- Update package documentation.
+- Add coordinated version preparation and actionable release-tag validation.
+
 ## 0.1.0
 
 - Extract the framework-neutral Weavour embedding core into an MIT-licensed package.

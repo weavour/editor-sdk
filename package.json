@@ -14,7 +14,8 @@
     "test": "npm run build && node --test tests/*.test.mjs",
     "test:browser": "playwright test",
     "test:packages": "node scripts/check-packages.mjs",
-    "verify": "npm run check && npm test && npm run test:packages"
+    "verify": "npm run check && npm test && npm run test:packages",
+    "version:sdk": "node scripts/version.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1",
