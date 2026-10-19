@@ -53,7 +53,12 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
       if (options.document !== undefined || options.subject !== undefined || options.preheader !== undefined) throw new TypeError('Use emailDocument or raw document/metadata, not both.');
       options = { ...options, document: full.content, subject: full.subject, preheader: full.preheader };
     }
-    if (options.draftId !== undefined && (options.document !== undefined || options.subject !== undefined || options.preheader !== undefined)) throw new TypeError('draftId cannot be combined with initial content.');
+    if (options.draftId !== undefined && (options.document !== undefined || options.subject !== undefined || options.preheader !== undefined)) {
+      if (settings.readiness !== 'configured') throw new TypeError('draftId cannot be combined with initial content.');
+      // Existing script integrations may pass a fallback email when resuming.
+      // A saved draft always wins; a failed resume must not save that fallback.
+      options = { ...options, document: undefined, subject: undefined, preheader: undefined };
+    }
     const mergeTags = options.mergeTags ?? options.editorConfig?.mergeTags;
     if (mergeTags !== undefined) resolveMergeTags([], mergeTags);
     const url = new URL(options.editorUrl || defaultEditorUrl);

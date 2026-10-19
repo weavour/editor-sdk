@@ -329,3 +329,13 @@ test('demo stays restricted through live updates, forged service messages and ex
   assert.equal(requests.length, 0); assert.equal(changes.length, 0); assert.equal(tests.length, 0);
   instance.destroy();
 });
+
+
+test('legacy draft resume ignores fallback initial content without overwriting saved work', () => {
+  const { window, frames } = setup();
+  const instance = window.Weavour.mount('#editor', { editorKey: 'ek', userId: 'u', draftId: '11111111-1111-4111-8111-111111111111', document: { type: 'doc' }, subject: 'Fallback' });
+  frames[0].listeners.get('load')();
+  const config = frames[0].messages[0].message.config;
+  assert.equal(config.document, undefined); assert.equal(config.subject, undefined);
+  instance.destroy();
+});

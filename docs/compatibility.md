@@ -16,7 +16,7 @@ its iframe is deployed and tested.
 Existing `Weavour.mount`, callbacks, export, template preview and flush remain.
 Prefer full-envelope persistence via `emailDocument` and `onDocumentChange`;
 raw content/subject/preheader options and `onChange` remain available. Reject
-ambiguous full-envelope/raw input and draft/initial-content combinations.
+ambiguous full-envelope/raw input and draft/initial-content combinations in the new API. The legacy bundle ignores fallback initial content when a draft ID is supplied, preserving saved-draft precedence.
 
 React identity and initial-content props are mount-only. Preserve work, then use
 a new React key to replace an editor. Themes and locales update live. Removing a
