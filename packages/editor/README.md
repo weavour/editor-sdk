@@ -1,8 +1,7 @@
 # Weavour editor SDKs
 
 Embed the hosted Weavour email editor in your application. Your application owns
-its users and sends the exported emails. The SDKs are MIT licensed; the hosted
-editor, rendering implementation and services are proprietary.
+its users and sends the exported emails.
 
 - `@weavour/editor`: JavaScript/TypeScript and classic script-tag integrations.
 - `@weavour/react`: React component using the same core and hosted iframe.
@@ -102,4 +101,3 @@ npm run verify
 npx playwright install chromium firefox webkit
 npm run test:browser
 ```
-
