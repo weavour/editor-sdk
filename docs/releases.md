@@ -18,7 +18,8 @@ Subsequent tag releases use OIDC, not a stored npm token.
    the Test workflow before publishing both packages with provenance. Versions
    must match the tag. Already-published bootstrap packages are skipped only when
    their registry integrity matches the current build. Tags are immutable and
-   never reused to fix a release.
+   never reused to fix a release. The trusted tag workflow also creates the GitHub
+   release with public package archives; reruns preserve existing release assets.
 4. In the private repository, pin the published version and run private integration
    checks for drafts, templates, uploads, AI, timers, demo and dashboard previews.
 5. Deploy additive iframe support before enabling a new SDK. Promote `/editor.js`

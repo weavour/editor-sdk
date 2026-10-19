@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
-      contents: read
+      contents: write
       id-token: write
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -31,3 +31,18 @@ jobs:
       - run: npm run build
       - run: npm run test:packages
       - run: node scripts/publish.mjs
+      - name: Prepare release archives
+        run: |
+          mkdir release
+          npm pack --workspace @weavour/editor --pack-destination release
+          npm pack --workspace @weavour/react --pack-destination release
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+            echo "Release already exists; preserving its assets."
+          else
+            gh release create "$RELEASE_TAG" release/*.tgz --verify-tag --title "$RELEASE_TAG" --notes-file CHANGELOG.md
+          fi
