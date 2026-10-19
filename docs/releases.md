@@ -9,7 +9,13 @@ For the first npm release, an owner must control the `@weavour` npm scope and
 bootstrap both public packages using npm's interactive authentication. Configure
 trusted publishers for `weavour/editor-sdk`, workflow `release.yml`, on both npm
 package settings. Scope ownership cannot be inferred from package-name availability.
-Subsequent tag releases use OIDC, not a stored npm token.
+Subsequent tag releases use OIDC, not a stored npm token. With npm 11.15+, configure
+each package using `npm trust github <package> --file release.yml
+--repo weavour/editor-sdk --allow-publish --yes` (the command can require a browser
+2FA check). Then run Release manually with the existing version tag to verify
+OIDC exchange even when both packages were already bootstrapped. This validates
+the trust relationship without publishing another package version. The workflow
+never persists or prints the exchanged credentials.
 
 1. Run `npm ci`, `npm run verify`, and `npm run test:browser`.
 2. Update both package versions and React's exact core dependency together, update

@@ -2,11 +2,19 @@ name: Release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to verify or resume
+        type: string
+        required: true
 permissions:
   contents: read
 jobs:
   test:
     uses: ./.github/workflows/test.yml
+    with:
+      source_ref: ${{ inputs.tag || github.ref }}
   publish:
     needs: test
     runs-on: ubuntu-latest
@@ -18,6 +26,7 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
+          ref: ${{ inputs.tag || github.ref }}
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
@@ -26,10 +35,28 @@ jobs:
       - run: npm ci
       - name: Verify tag versions
         env:
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: node scripts/check-release.mjs
       - run: npm run build
       - run: npm run test:packages
+      - name: Verify npm trusted publisher identity
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          const endpoint = new URL(process.env.ACTIONS_ID_TOKEN_REQUEST_URL);
+          endpoint.searchParams.set('audience', 'npm:registry.npmjs.org');
+          const identity = await fetch(endpoint, { headers: { Authorization: `Bearer ${process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}` } });
+          if (!identity.ok) throw new Error(`GitHub OIDC request failed (${identity.status}).`);
+          const { value } = await identity.json();
+          if (typeof value !== 'string') throw new Error('GitHub did not return an OIDC token.');
+          for (const name of ['@weavour/editor', '@weavour/react']) {
+            const exchanged = await fetch('https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/' + encodeURIComponent(name), { method: 'POST', headers: { Authorization: `Bearer ${value}` } });
+            if (!exchanged.ok) throw new Error(`npm trusted publisher verification failed for ${name} (${exchanged.status}).`);
+            // Do not persist or log either short-lived credential.
+            await exchanged.body?.cancel();
+            console.log(`${name}: trusted GitHub workflow identity verified.`);
+          }
+          JS
       - run: node scripts/publish.mjs
       - name: Prepare release archives
         run: |
@@ -39,7 +66,7 @@ jobs:
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
             echo "Release already exists; preserving its assets."
