@@ -33,9 +33,7 @@ editor.destroy();
 
 Supply an element with an explicit height, for example 700px. The SDK appends a
 full-width, full-height titled iframe and preserves other container children.
-The default iframe is `https://weavour.com/editor`. Local integration can set
-`editorUrl: 'http://localhost:8788/editor'` and
-`apiUrl: 'http://localhost:8787'` explicitly.
+The default iframe is `https://weavour.com/editor`.
 
 ## Script tags
 
@@ -105,10 +103,4 @@ npx playwright install chromium firefox webkit
 npm run test:browser
 ```
 
-GitHub Actions runs package checks and tests on **every push and pull request**,
-using Node 22/24 and React 18/19, plus Chromium, Firefox and WebKit browser checks.
-Browser tests use a small mock iframe, not a copy of the hosted editor. Real
-hosted integrations require a configured public editor key and allowed origin.
-
-See [release instructions](docs/releases.md) for npm trusted publishing and
-private hosted-editor promotion. Installing this SDK does not self-host the editor.
+Installing this SDK does not self-host the editor.

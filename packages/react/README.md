@@ -16,4 +16,4 @@ keyed remount. Imports are SSR safe; the bundle preserves its `use client` bound
 
 The hosted editor and services remain private. Your application handles delivery.
 Full API, identity/scoping rules, examples and release compatibility:
-https://github.com/weavour/editor-sdk
+<https://github.com/weavour/editor-sdk>
