@@ -24,9 +24,13 @@ test('React Strict Mode cleans up, updates config/callbacks without remounting a
   await act(async () => root.render(h(StrictMode, {}, h(WeavourEditor, { ...base, onChange: () => changes.push('old') }))));
   assert.equal(host.querySelectorAll('iframe').length, 1);
   const frame = host.querySelector('iframe'); const bridge = ready(frame); await ref.current.ready;
-  await act(async () => root.render(h(StrictMode, {}, h(WeavourEditor, { ...base, theme: { mode: 'dark' }, locale: 'fr', onChange: () => changes.push('latest') }))));
+  await act(async () => root.render(h(StrictMode, {}, h(WeavourEditor, { ...base, theme: { mode: 'dark' }, locale: 'fr', enableEmailAudit: false, onChange: () => changes.push('latest') }))));
   assert.equal(host.querySelector('iframe'), frame);
   assert.equal(bridge.sent.at(-1).config.locale, 'fr');
+  assert.equal(bridge.sent.at(-1).config.enableEmailAudit, false);
+  await act(async () => root.render(h(StrictMode, {}, h(WeavourEditor, { ...base, enableEmailAudit: true, onChange: () => changes.push('latest') }))));
+  assert.equal(host.querySelector('iframe'), frame);
+  assert.equal(bridge.sent.at(-1).config.enableEmailAudit, true);
   bridge.send({ type: 'weavour:document-change', document: { type: 'doc' } });
   assert.deepEqual(changes, ['latest']);
   const pending = ref.current.exportHTML(); const request = bridge.sent.at(-1);

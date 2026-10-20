@@ -40,6 +40,9 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
     for (const value of [options.enableTemplates, options.editorConfig?.enableTemplates]) {
       if (value !== undefined && typeof value !== "boolean") throw new TypeError("enableTemplates must be a boolean.");
     }
+    for (const value of [options.enableEmailAudit, options.editorConfig?.enableEmailAudit]) {
+      if (value !== undefined && typeof value !== 'boolean') throw new TypeError('enableEmailAudit must be a boolean.');
+    }
     for (const [name, limit] of [['subject', 200], ['preheader', 500]] as const) {
       if (options[name] !== undefined && (typeof options[name] !== 'string' || options[name].length > limit)) throw new TypeError(name + ' must be a string within its length limit.');
     }
@@ -72,6 +75,7 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
       editorKey: options.editorKey,
       draftId: options.draftId,
       enableAutosave: options.enableAutosave ?? options.editorConfig?.enableAutosave,
+      enableEmailAudit: options.enableEmailAudit ?? options.editorConfig?.enableEmailAudit,
       userId: options.userId,
       organizationId: options.organizationId,
       locale: options.locale || "en",
@@ -247,7 +251,7 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
         configured = true; ready = true;
         iframe.style.visibility = 'visible';
         clearTimeout(timer);
-        if (config.allowedBlocks !== undefined) post({ type: 'weavour:update-config', version: 1, config: { allowedBlocks: config.allowedBlocks } }, origin);
+        if (config.allowedBlocks !== undefined || config.enableEmailAudit !== undefined) post({ type: 'weavour:update-config', version: 1, config: { allowedBlocks: config.allowedBlocks, enableEmailAudit: config.enableEmailAudit } }, origin);
         resolveReady();
         if (typeof options.onReady === "function") options.onReady();
       }
@@ -386,6 +390,8 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
           for (const [id, operation] of flushes) { clearTimeout(operation.timeout); operation.reject(new EditorError('autosave_disabled', 'Autosave is disabled.')); flushes.delete(id); }
         }
       }
+      if (next.enableEmailAudit !== undefined && typeof next.enableEmailAudit !== 'boolean') throw new TypeError('enableEmailAudit must be a boolean.');
+      if (next.enableEmailAudit !== undefined) config.enableEmailAudit = next.enableEmailAudit;
       if (next.enableAi !== undefined && typeof next.enableAi !== 'boolean') throw new TypeError('enableAi must be a boolean.');
       if (next.enableAi !== undefined) config.enableAi = next.enableAi;
       if (Object.hasOwn(next, 'aiPaidOrigin')) {
@@ -405,7 +411,7 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
         config.theme = { ...config.theme, ...structuredClone(next.theme) };
       }
       if (next.locale) config.locale = next.locale;
-      if (ready) post({ type: "weavour:update-config", version: 1, config: { mergeTags: config.mergeTags, theme: config.theme, locale: config.locale, enableAi: config.enableAi, enableTemplates: config.enableTemplates, enableAutosave: config.enableAutosave, allowedBlocks: config.allowedBlocks } }, origin);
+      if (ready) post({ type: "weavour:update-config", version: 1, config: { mergeTags: config.mergeTags, theme: config.theme, locale: config.locale, enableAi: config.enableAi, enableTemplates: config.enableTemplates, enableAutosave: config.enableAutosave, enableEmailAudit: config.enableEmailAudit, allowedBlocks: config.allowedBlocks } }, origin);
     }
     function exportHTML(previewOnly = false): Promise<any> {
       if (demo) return Promise.reject(new EditorError('demo_restricted', 'Export is disabled in demo mode.'));

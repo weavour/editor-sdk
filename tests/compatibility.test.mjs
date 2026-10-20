@@ -339,3 +339,25 @@ test('legacy draft resume ignores fallback initial content without overwriting s
   assert.equal(config.document, undefined); assert.equal(config.subject, undefined);
   instance.destroy();
 });
+
+
+test('email audit mount preferences validate and update live without replacing the iframe', () => {
+  for (const [options, expected] of [[{}, undefined], [{ editorConfig: { enableEmailAudit: false } }, false], [{ enableEmailAudit: false }, false], [{ editorConfig: { enableEmailAudit: false }, enableEmailAudit: true }, true]]) {
+    const { window, frames, listeners } = setup();
+    const instance = window.Weavour.mount('#editor', { editorKey: 'ek', userId: 'user', ...options });
+    const frame = frames[0]; frame.listeners.get('load')();
+    assert.equal(frame.messages[0].message.config.enableEmailAudit, expected);
+    listeners.get('message')({ origin: 'https://editor.example', source: frame.contentWindow, data: { type: 'weavour:ready', version: 1 } });
+    for (const enabled of [false, true]) {
+      instance.updateConfig({ enableEmailAudit: enabled });
+      assert.equal(frame.messages.at(-1).message.config.enableEmailAudit, enabled);
+    }
+    assert.throws(() => instance.updateConfig({ enableEmailAudit: 'false' }), /boolean/);
+    assert.equal(frames.length, 1);
+    instance.destroy();
+  }
+  const { window } = setup();
+  for (const options of [{ enableEmailAudit: 'false' }, { editorConfig: { enableEmailAudit: 0 } }]) {
+    assert.throws(() => window.Weavour.mount('#editor', { editorKey: 'ek', userId: 'user', ...options }), /boolean/);
+  }
+});

@@ -3,7 +3,7 @@ import { forwardRef, createElement, useEffect, useImperativeHandle, useRef, type
 import { mount, EditorError, type EditorInstance, type MountOptions, type EditorConfig } from '@weavour/editor';
 export type WeavourEditorProps = MountOptions & Omit<HTMLAttributes<HTMLDivElement>, keyof MountOptions | 'children'>;
 export type WeavourEditorRef = Omit<EditorInstance, 'destroy'>;
-const liveKeys = ['theme', 'locale', 'mergeTags', 'allowedBlocks', 'enableAi', 'aiPaidOrigin', 'enableTemplates', 'enableAutosave'] as const;
+const liveKeys = ['theme', 'locale', 'mergeTags', 'allowedBlocks', 'enableAi', 'aiPaidOrigin', 'enableTemplates', 'enableAutosave', 'enableEmailAudit'] as const;
 const mountKeys = ['editorKey', 'userId', 'organizationId', 'document', 'emailDocument', 'subject', 'preheader', 'draftId', 'editorUrl', 'apiUrl', 'editorConfig', 'demo'] as const;
 
 /** Mount-only props require an explicit React key change to replace the session. */

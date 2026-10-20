@@ -72,6 +72,14 @@ to switch identity or initial documents, after preserving current work. Callback
 changes do not recreate the iframe. Imports are SSR-safe; mounting runs on the
 client. Next.js examples use a client component boundary.
 
+## Email audit
+
+Email-content quality checks are enabled by default. Set `enableEmailAudit: false`
+at mount, in `editorConfig`, or through `editor.updateConfig(...)` to turn them
+off. The React wrapper also accepts `enableEmailAudit` as a live prop. A saved
+dashboard disable takes precedence over SDK preferences. Toggling preserves the
+email and undo history. This requires the matching hosted iframe support.
+
 ## Identity and permissions
 
 `editorKey` is public. `userId` and optional `organizationId` are declarative

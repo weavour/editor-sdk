@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2
+
+- Add `enableEmailAudit` to mount options, editor defaults and live configuration.
+- Forward React email-audit prop changes without remounting the editor.
+- Preserve audit preference updates made while the iframe is initializing.
+
 ## 0.1.1
 
 - Update package documentation.

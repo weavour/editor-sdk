@@ -74,3 +74,16 @@ test('wire payloads reject excessive nesting, cycles and non-JSON values', () =>
   assert.equal(validMessage({ type: 'big', data: 'x'.repeat(2_100_000) }), false);
   assert.equal(validMessage({ type: 'weavour:ready', version: 1 }), true);
 });
+
+
+test('audit preferences changed during initialization reach the application when ready', async () => {
+  const h = setup();
+  h.instance.updateConfig({ enableEmailAudit: false });
+  h.instance.updateConfig({ enableEmailAudit: true });
+  h.send({ type: 'weavour:ready', capabilities: { applicationReady: true } });
+  h.send({ type: 'weavour:application-ready' });
+  await h.instance.ready;
+  assert.equal(h.sent.at(-1).type, 'weavour:update-config');
+  assert.equal(h.sent.at(-1).config.enableEmailAudit, true);
+  h.instance.destroy(); h.window.happyDOM.abort();
+});

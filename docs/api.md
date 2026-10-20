@@ -5,7 +5,7 @@ configuration throws. `target` is an HTMLElement or selector. `editorKey` and an
 effective `userId` are required. Supplied IDs retain valid whitespace and case.
 
 Options include `organizationId`, `locale`, `theme`, `mergeTags`, `allowedBlocks`,
-`enableTemplates`, `enableAutosave`, `enableAi`, `aiPaidOrigin`, initial raw
+`enableTemplates`, `enableAutosave`, `enableEmailAudit`, `enableAi`, `aiPaidOrigin`, initial raw
 `document`/`subject`/`preheader`, `emailDocument`, `draftId`, `editorUrl`, `apiUrl`
 and `demo`. `editorConfig` provides saved defaults under explicit mount overrides.
 Local flags cannot grant server-denied permissions or paid features.
@@ -36,7 +36,7 @@ Prefer `onDocumentChange` when persisting email JSON:
 Callbacks are distinct from hosted save acknowledgement. Exports do not save.
 
 `updateConfig` supports appearance, locale, merge tags, allowed blocks, templates,
-autosave, AI enablement and the paid origin used for local AI. Identity,
+autosave, email audit, AI enablement and the paid origin used for local AI. Identity,
 initial content, draft ID and endpoint overrides require a new mount. Empty
 `allowedBlocks` hides all palette entries without deleting existing content.
 `mergeTags: undefined` clears embed definitions and returns to dashboard/default
@@ -50,3 +50,11 @@ and rejects pending host methods; a network timeout does not prove a server-side
 mutation failed. Reconcile through the hosted feature's retry/recovery flow.
 `EditorError` extends Error and exposes a stable `code`; server export/save
 failures retain their actionable message. See exported declarations for types.
+
+`enableEmailAudit` controls the live email-content quality rating and checks.
+It defaults to enabled in the hosted editor. Set it to `false` at mount (or in
+`editorConfig`) to opt out, or call `updateConfig({ enableEmailAudit: false })`.
+Top-level mount preferences override `editorConfig`. A saved dashboard disable
+always wins. Disabling removes the audit UI and stops its background checks;
+reenabling checks the current email without replacing content or undo history.
+The option changes editor behavior only, not exported email content.
