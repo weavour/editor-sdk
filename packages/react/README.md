@@ -17,3 +17,8 @@ keyed remount. Imports are SSR safe; the bundle preserves its `use client` bound
 The hosted editor and services remain private. Your application handles delivery.
 Full API, identity/scoping rules, examples and release compatibility:
 <https://github.com/weavour/editor-sdk>
+
+Use `enableOrganizationBlocks={false}` to hide organization-block saving and reuse.
+The prop updates live without remounting. It defaults to enabled for organization
+mounts; the saved dashboard disable remains authoritative. Existing email content
+and saved blocks are retained. See the core SDK reference for full configuration.

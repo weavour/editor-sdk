@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.4
+
+- Add `enableOrganizationBlocks` to mount options, editor defaults and live configuration, including React prop updates without remounting.
+- Reject organization-block transport when locally disabled; the hosted service remains authoritative for saved restrictions.
+
+## 0.1.3
+
+- Forward scoped organization-block operations through the hosted library transport, independently of template availability. Advertise support to the hosted editor; retain origin/session checks and mount-owned organization/user namespaces.
+
 ## 0.1.2
 
 - Add `enableEmailAudit` to mount options, editor defaults and live configuration.

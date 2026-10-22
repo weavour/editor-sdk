@@ -18,7 +18,7 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
     const demo = options.demo === true;
     const demoBlocks: EditorBlockId[] = ['text', 'heading', 'button', 'divider', 'list', 'space', 'menu', 'unsubscribe', 'section', 'columns'];
     if (demo) options = { ...options, editorKey: 'ek_public_demo', userId: 'demo', draftId: undefined,
-      enableAutosave: false, enableAi: false, enableTemplates: false,
+      enableAutosave: false, enableAi: false, enableTemplates: false, enableOrganizationBlocks: false,
       allowedBlocks: demoBlocks.filter(block => !options.allowedBlocks || options.allowedBlocks.includes(block)) };
     for (const blocks of [options.allowedBlocks, options.editorConfig?.allowedBlocks]) {
       if (blocks !== undefined && (!Array.isArray(blocks) || blocks.some(block => typeof block !== "string"))) throw new TypeError("allowedBlocks must be an array of block names.");
@@ -39,6 +39,9 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
     if (options.aiPaidOrigin !== undefined && (typeof options.aiPaidOrigin !== 'string' || new URL(options.aiPaidOrigin).origin !== options.aiPaidOrigin)) throw new TypeError('aiPaidOrigin must be an origin.');
     for (const value of [options.enableTemplates, options.editorConfig?.enableTemplates]) {
       if (value !== undefined && typeof value !== "boolean") throw new TypeError("enableTemplates must be a boolean.");
+    }
+    for (const value of [options.enableOrganizationBlocks, options.editorConfig?.enableOrganizationBlocks]) {
+      if (value !== undefined && typeof value !== 'boolean') throw new TypeError('enableOrganizationBlocks must be a boolean.');
     }
     for (const value of [options.enableEmailAudit, options.editorConfig?.enableEmailAudit]) {
       if (value !== undefined && typeof value !== 'boolean') throw new TypeError('enableEmailAudit must be a boolean.');
@@ -75,12 +78,13 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
       editorKey: options.editorKey,
       draftId: options.draftId,
       enableAutosave: options.enableAutosave ?? options.editorConfig?.enableAutosave,
+      enableOrganizationBlocks: options.enableOrganizationBlocks ?? options.editorConfig?.enableOrganizationBlocks,
       enableEmailAudit: options.enableEmailAudit ?? options.editorConfig?.enableEmailAudit,
       userId: options.userId,
       organizationId: options.organizationId,
       locale: options.locale || "en",
       theme: { ...options.editorConfig?.theme, ...options.theme },
-      capabilities: { testEmail: !demo && typeof options.onTestEmail === "function", changeCallback: !demo && (typeof options.onChange === "function" || typeof options.onDocumentChange === "function") },
+      capabilities: { organizationBlocks: !demo, testEmail: !demo && typeof options.onTestEmail === "function", changeCallback: !demo && (typeof options.onChange === "function" || typeof options.onDocumentChange === "function") },
       allowedBlocks: options.allowedBlocks ?? options.editorConfig?.allowedBlocks,
       enableTemplates: options.enableTemplates ?? options.editorConfig?.enableTemplates ?? true,
       document: options.document,
@@ -251,7 +255,7 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
         configured = true; ready = true;
         iframe.style.visibility = 'visible';
         clearTimeout(timer);
-        if (config.allowedBlocks !== undefined || config.enableEmailAudit !== undefined) post({ type: 'weavour:update-config', version: 1, config: { allowedBlocks: config.allowedBlocks, enableEmailAudit: config.enableEmailAudit } }, origin);
+        if (config.allowedBlocks !== undefined || config.enableEmailAudit !== undefined || config.enableOrganizationBlocks !== undefined) post({ type: 'weavour:update-config', version: 1, config: { allowedBlocks: config.allowedBlocks, enableOrganizationBlocks: config.enableOrganizationBlocks, enableEmailAudit: config.enableEmailAudit } }, origin);
         resolveReady();
         if (typeof options.onReady === "function") options.onReady();
       }
@@ -280,8 +284,11 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
         templateRequests.get(message.id)?.abort();
       }
       if (message.type === 'weavour:template-request' && configured && typeof message.id === 'string' && !templateRequests.has(message.id)) {
-        if (!/^templates(?:\/[a-zA-Z0-9-]+)?$/.test(message.path) || !['GET', 'POST', 'PATCH', 'DELETE'].includes(message.method) || templateRequests.size >= 8) return;
-        if (config.enableTemplates === false) {
+        if (!/^(?:templates|organization-blocks)(?:\/[a-zA-Z0-9-]+)?$/.test(message.path) || !['GET', 'POST', 'PATCH', 'DELETE'].includes(message.method) || templateRequests.size >= 8) return;
+        if (config.enableOrganizationBlocks === false && message.path.startsWith('organization-blocks')) {
+          post({ type: 'weavour:template-result', version: 1, id: message.id, error: 'organization_blocks_disabled' }, origin); return;
+        }
+        if (config.enableTemplates === false && message.path.startsWith('templates')) {
           post({ type: 'weavour:template-result', version: 1, id: message.id, error: 'templates_disabled' }, origin); return;
         }
         const controller = new AbortController(); templateRequests.set(message.id, controller);
@@ -376,7 +383,7 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
       if (destroyed) throw new EditorError('destroyed', "This editor has been destroyed.");
       for (const key of settings.readiness === 'configured' ? [] : ['editorKey', 'userId', 'organizationId', 'document', 'emailDocument', 'draftId']) if (next && Object.hasOwn(next, key)) throw new TypeError(key + ' is mount-only.');
       if (!next || typeof next !== "object") throw new TypeError("Configuration is required.");
-      if (demo) next = { ...next, enableAutosave: false, enableAi: false, enableTemplates: false,
+      if (demo) next = { ...next, enableAutosave: false, enableAi: false, enableTemplates: false, enableOrganizationBlocks: false,
         allowedBlocks: demoBlocks.filter(block => !(next.allowedBlocks ?? config.allowedBlocks) || (next.allowedBlocks ?? config.allowedBlocks).includes(block)) };
       if (Object.hasOwn(next, 'mergeTags')) {
         if (next.mergeTags !== undefined) resolveMergeTags([], next.mergeTags);
@@ -390,6 +397,8 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
           for (const [id, operation] of flushes) { clearTimeout(operation.timeout); operation.reject(new EditorError('autosave_disabled', 'Autosave is disabled.')); flushes.delete(id); }
         }
       }
+      if (next.enableOrganizationBlocks !== undefined && typeof next.enableOrganizationBlocks !== 'boolean') throw new TypeError('enableOrganizationBlocks must be a boolean.');
+      if (next.enableOrganizationBlocks !== undefined) config.enableOrganizationBlocks = next.enableOrganizationBlocks;
       if (next.enableEmailAudit !== undefined && typeof next.enableEmailAudit !== 'boolean') throw new TypeError('enableEmailAudit must be a boolean.');
       if (next.enableEmailAudit !== undefined) config.enableEmailAudit = next.enableEmailAudit;
       if (next.enableAi !== undefined && typeof next.enableAi !== 'boolean') throw new TypeError('enableAi must be a boolean.');
@@ -411,7 +420,7 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
         config.theme = { ...config.theme, ...structuredClone(next.theme) };
       }
       if (next.locale) config.locale = next.locale;
-      if (ready) post({ type: "weavour:update-config", version: 1, config: { mergeTags: config.mergeTags, theme: config.theme, locale: config.locale, enableAi: config.enableAi, enableTemplates: config.enableTemplates, enableAutosave: config.enableAutosave, enableEmailAudit: config.enableEmailAudit, allowedBlocks: config.allowedBlocks } }, origin);
+      if (ready) post({ type: "weavour:update-config", version: 1, config: { mergeTags: config.mergeTags, theme: config.theme, locale: config.locale, enableAi: config.enableAi, enableTemplates: config.enableTemplates, enableAutosave: config.enableAutosave, enableOrganizationBlocks: config.enableOrganizationBlocks, enableEmailAudit: config.enableEmailAudit, allowedBlocks: config.allowedBlocks } }, origin);
     }
     function exportHTML(previewOnly = false): Promise<any> {
       if (demo) return Promise.reject(new EditorError('demo_restricted', 'Export is disabled in demo mode.'));

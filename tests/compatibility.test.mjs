@@ -361,3 +361,24 @@ test('email audit mount preferences validate and update live without replacing t
     assert.throws(() => window.Weavour.mount('#editor', { editorKey: 'ek', userId: 'user', ...options }), /boolean/);
   }
 });
+
+test('organization block mount preferences validate and update live without replacing the iframe', () => {
+  for (const [options, expected] of [[{}, undefined], [{ editorConfig: { enableOrganizationBlocks: false } }, false], [{ enableOrganizationBlocks: false }, false], [{ editorConfig: { enableOrganizationBlocks: false }, enableOrganizationBlocks: true }, true]]) {
+    const { window, frames, listeners } = setup();
+    const instance = window.Weavour.mount('#editor', { editorKey: 'ek', userId: 'user', ...options });
+    const frame = frames[0]; frame.listeners.get('load')();
+    assert.equal(frame.messages[0].message.config.enableOrganizationBlocks, expected);
+    listeners.get('message')({ origin: 'https://editor.example', source: frame.contentWindow, data: { type: 'weavour:ready', version: 1 } });
+    for (const enabled of [false, true]) {
+      instance.updateConfig({ enableOrganizationBlocks: enabled });
+      assert.equal(frame.messages.at(-1).message.config.enableOrganizationBlocks, enabled);
+    }
+    assert.throws(() => instance.updateConfig({ enableOrganizationBlocks: 'false' }), /boolean/);
+    assert.equal(frames.length, 1);
+    instance.destroy();
+  }
+  const { window } = setup();
+  for (const options of [{ enableOrganizationBlocks: 'false' }, { editorConfig: { enableOrganizationBlocks: 0 } }]) {
+    assert.throws(() => window.Weavour.mount('#editor', { editorKey: 'ek', userId: 'user', ...options }), /boolean/);
+  }
+});

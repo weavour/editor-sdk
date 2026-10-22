@@ -4,11 +4,11 @@ import { Window } from 'happy-dom';
 import { createSDK, EditorError } from '../packages/editor/dist/index.js';
 import { validMessage, emailDocument } from '../packages/editor/dist/protocol.js';
 
-function setup(settings = {}) {
+function setup(settings = {}, options = {}) {
   const window = new Window({ url: 'https://host.example' });
   for (const key of ['window', 'document', 'HTMLElement', 'MessageEvent']) globalThis[key] = key === 'window' ? window : window[key];
   const container = document.createElement('div'); document.body.append(container);
-  const instance = createSDK(settings).mount(container, { editorKey: 'ek_test', userId: 'user' });
+  const instance = createSDK(settings).mount(container, { editorKey: 'ek_test', userId: 'user', ...options });
   const frame = container.querySelector('iframe');
   const sent = []; frame.contentWindow.postMessage = message => sent.push(message);
   frame.dispatchEvent(new window.Event('load'));
@@ -85,5 +85,52 @@ test('audit preferences changed during initialization reach the application when
   await h.instance.ready;
   assert.equal(h.sent.at(-1).type, 'weavour:update-config');
   assert.equal(h.sent.at(-1).config.enableEmailAudit, true);
+  h.instance.destroy(); h.window.happyDOM.abort();
+});
+
+
+test('organization-block transport uses mount scope independently of template availability', async () => {
+  const calls = [];
+  const h = setup({ fetch: async (url, init) => { calls.push({ url: new URL(url), init }); return { ok: true, json: async () => ({ blocks: [] }) }; } }, { organizationId: 'real-org', enableTemplates: false });
+  assert.equal(h.config.capabilities.organizationBlocks, true);
+  h.send({ type: 'weavour:application-ready' }); await h.instance.ready;
+  h.send({ type: 'weavour:template-request', id: 'blocks', method: 'GET', path: 'organization-blocks', query: { search: 'header', organizationId: 'forged', userId: 'forged' } });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url.pathname, '/editors/ek_test/organization-blocks');
+  assert.equal(calls[0].url.searchParams.get('organizationId'), 'real-org');
+  assert.equal(calls[0].url.searchParams.get('userId'), 'user');
+  assert.equal(calls[0].url.searchParams.get('search'), 'header');
+  assert.equal(calls[0].init.credentials, 'omit');
+  h.send({ type: 'weavour:template-request', id: 'escape', method: 'GET', path: 'organization-blocks/../templates' });
+  h.send({ type: 'weavour:template-request', id: 'template', method: 'GET', path: 'templates' });
+  assert.equal(calls.length, 1);
+  assert.equal(h.sent.at(-1).error, 'templates_disabled');
+  h.instance.destroy(); h.window.happyDOM.abort();
+});
+
+test('organization-block preferences changed during initialization reach the application when ready', async () => {
+  const h = setup();
+  h.instance.updateConfig({ enableOrganizationBlocks: false });
+  h.instance.updateConfig({ enableOrganizationBlocks: true });
+  h.send({ type: 'weavour:ready', capabilities: { applicationReady: true } });
+  h.send({ type: 'weavour:application-ready' });
+  await h.instance.ready;
+  assert.equal(h.sent.at(-1).type, 'weavour:update-config');
+  assert.equal(h.sent.at(-1).config.enableOrganizationBlocks, true);
+  h.instance.destroy(); h.window.happyDOM.abort();
+});
+
+test('disabled organization blocks reject transport without fetching', async () => {
+  let calls = 0;
+  const h = setup({ fetch: async () => { calls++; return { ok: true, json: async () => ({ blocks: [] }) }; } }, { organizationId: 'org', enableOrganizationBlocks: false });
+  h.send({ type: 'weavour:application-ready' }); await h.instance.ready;
+  h.send({ type: 'weavour:template-request', id: 'disabled', method: 'GET', path: 'organization-blocks' });
+  assert.equal(h.sent.at(-1).error, 'organization_blocks_disabled');
+  assert.equal(calls, 0);
+  h.instance.updateConfig({ enableOrganizationBlocks: true });
+  h.send({ type: 'weavour:template-request', id: 'enabled', method: 'GET', path: 'organization-blocks' });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(calls, 1);
   h.instance.destroy(); h.window.happyDOM.abort();
 });

@@ -72,6 +72,17 @@ to switch identity or initial documents, after preserving current work. Callback
 changes do not recreate the iframe. Imports are SSR-safe; mounting runs on the
 client. Next.js examples use a client component boundary.
 
+## Organization blocks
+
+Organization blocks are enabled by default for mounts with both `userId` and
+`organizationId`. Set `enableOrganizationBlocks: false` at mount, in
+`editorConfig`, or through `updateConfig()` to hide the shared library and
+**Save organization block** action. The React wrapper accepts the same live prop.
+The dashboard switch is available when creating or editing an editor; a saved
+server-side disable cannot be overridden by the SDK. Saved blocks and copies
+already inserted in emails remain intact. This preference is independent of
+`enableTemplates` and does not remove standard layout blocks.
+
 ## Email audit
 
 Email-content quality checks are enabled by default. Set `enableEmailAudit: false`

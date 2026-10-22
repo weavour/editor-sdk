@@ -10,7 +10,7 @@ export type SaveStatusChange = DraftChange & { status: SaveStatus };
 export type DraftSummary = { id: string; subject: string; revision: number; metadataRevision: number; hash: string; createdAt: number; updatedAt: number; archivedAt: number | null; sourceTemplateId: string | null; baseTemplateRevision: number | null };
 export type DraftFlushResult = { draft: DraftSummary | null };
 export type TestEmailRequest = { to: string; subject: string; html: string; text: string; document: Record<string, unknown> };
-export type EditorConfig = { theme?: EditorTheme; mergeTags?: MergeTag[]; locale?: string; allowedBlocks?: EditorBlockId[]; enableAi?: boolean; aiPaidOrigin?: string; enableTemplates?: boolean; enableAutosave?: boolean; enableEmailAudit?: boolean };
+export type EditorConfig = { theme?: EditorTheme; mergeTags?: MergeTag[]; locale?: string; allowedBlocks?: EditorBlockId[]; enableAi?: boolean; aiPaidOrigin?: string; enableTemplates?: boolean; enableAutosave?: boolean; enableOrganizationBlocks?: boolean; enableEmailAudit?: boolean };
 export type EditorCallbacks = {
   onReady?(): void;
   onError?(error: Error): void;
