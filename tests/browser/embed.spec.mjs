@@ -8,11 +8,13 @@ for (const width of [1280, 390]) {
     await expect(frame.getByRole('textbox', { name: 'Edit email' })).toBeVisible();
     expect(await page.evaluate(() => window.instance.exportHTML())).toMatchObject({ html: '<p>Hello</p>' });
     expect(await page.evaluate(() => window.instance.flushAutosave())).toEqual({ draft: null });
-    await page.evaluate(() => window.instance.updateConfig({ locale: 'fr', theme: { mode: 'dark' }, enableEmailAudit: false }));
+    await page.evaluate(() => window.instance.updateConfig({ locale: 'fr', theme: { mode: 'dark' }, enableEmailAudit: false, enableTestEmail: false }));
     await expect.poll(() => frame.locator('body').evaluate(() => window.config.locale)).toBe('fr');
     await expect.poll(() => frame.locator('body').evaluate(() => window.config.enableEmailAudit)).toBe(false);
-    await page.evaluate(() => window.instance.updateConfig({ enableEmailAudit: true }));
+    await expect.poll(() => frame.locator('body').evaluate(() => window.config.enableTestEmail)).toBe(false);
+    await page.evaluate(() => window.instance.updateConfig({ enableEmailAudit: true, enableTestEmail: true }));
     await expect.poll(() => frame.locator('body').evaluate(() => window.config.enableEmailAudit)).toBe(true);
+    await expect.poll(() => frame.locator('body').evaluate(() => window.config.enableTestEmail)).toBe(true);
     await expect(page.locator('iframe')).toHaveCount(1);
     await page.route('**/editors/ek_test/templates?**', async route => {
       const request = route.request(); const url = new URL(request.url());

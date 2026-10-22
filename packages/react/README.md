@@ -18,6 +18,10 @@ The hosted editor and services remain private. Your application handles delivery
 Full API, identity/scoping rules, examples and release compatibility:
 <https://github.com/weavour/editor-sdk>
 
+Use `enableTestEmail={false}` to hide the toolbar test button. It is visible by
+default and updates live without remounting. Your application can keep its own
+export and delivery flow. Hiding the button closes an open editor test dialog.
+
 Use `enableOrganizationBlocks={false}` to hide organization-block saving and reuse.
 The prop updates live without remounting. It defaults to enabled for organization
 mounts; the saved dashboard disable remains authoritative. Existing email content

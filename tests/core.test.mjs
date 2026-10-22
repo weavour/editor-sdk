@@ -17,6 +17,34 @@ function setup(settings = {}, options = {}) {
   return { instance, window, container, frame, sent, send, config };
 }
 
+test('test email visibility validates mount defaults, precedence and pre-ready/live updates', async () => {
+  for (const [options, expected] of [[{}, undefined], [{ editorConfig: { enableTestEmail: false } }, false], [{ enableTestEmail: false }, false], [{ editorConfig: { enableTestEmail: false }, enableTestEmail: true }, true]]) {
+    const h = setup({}, { ...options, onTestEmail() {} });
+    assert.equal(h.config.enableTestEmail, expected);
+    assert.equal(h.config.capabilities.testEmail, true);
+    h.instance.updateConfig({ enableTestEmail: false });
+    h.send({ type: 'weavour:application-ready' }); await h.instance.ready;
+    assert.equal(h.sent.at(-1).config.enableTestEmail, false);
+    for (const enabled of [true, false]) {
+      h.instance.updateConfig({ enableTestEmail: enabled });
+      assert.equal(h.sent.at(-1).config.enableTestEmail, enabled);
+    }
+    assert.throws(() => h.instance.updateConfig({ enableTestEmail: 'false' }), /boolean/);
+    assert.equal(h.container.querySelector('iframe'), h.frame);
+    h.instance.destroy(); await h.window.happyDOM.abort();
+  }
+  for (const options of [{ enableTestEmail: 'false' }, { editorConfig: { enableTestEmail: 0 } }]) {
+    assert.throws(() => setup({}, options), /boolean/);
+    await window.happyDOM.abort();
+  }
+  const demo = setup({}, { demo: true, enableTestEmail: true });
+  assert.equal(demo.config.enableTestEmail, false);
+  demo.send({ type: 'weavour:application-ready' }); await demo.instance.ready;
+  demo.instance.updateConfig({ enableTestEmail: true });
+  assert.equal(demo.sent.at(-1).config.enableTestEmail, false);
+  demo.instance.destroy(); await demo.window.happyDOM.abort();
+});
+
 test('SSR imports expose a mount function without requiring a browser', async () => {
   const { execFileSync } = await import('node:child_process');
   execFileSync(process.execPath, ['--input-type=module', '-e', "import {mount} from './packages/editor/dist/index.js'; import './packages/react/dist/index.js'; if(typeof mount!=='function') process.exit(1)"], { stdio: 'pipe' });

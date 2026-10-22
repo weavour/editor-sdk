@@ -382,3 +382,23 @@ test('organization block mount preferences validate and update live without repl
     assert.throws(() => window.Weavour.mount('#editor', { editorKey: 'ek', userId: 'user', ...options }), /boolean/);
   }
 });
+test('test email visibility mount preferences validate and update live without replacing the iframe', () => {
+  for (const [options, expected] of [[{}, undefined], [{ editorConfig: { enableTestEmail: false } }, false], [{ enableTestEmail: false }, false], [{ editorConfig: { enableTestEmail: false }, enableTestEmail: true }, true]]) {
+    const { window, frames, listeners } = setup();
+    const instance = window.Weavour.mount('#editor', { editorKey: 'ek', userId: 'user', ...options });
+    const frame = frames[0]; frame.listeners.get('load')();
+    assert.equal(frame.messages[0].message.config.enableTestEmail, expected);
+    listeners.get('message')({ origin: 'https://editor.example', source: frame.contentWindow, data: { type: 'weavour:ready', version: 1 } });
+    for (const enabled of [false, true]) {
+      instance.updateConfig({ enableTestEmail: enabled });
+      assert.equal(frame.messages.at(-1).message.config.enableTestEmail, enabled);
+    }
+    assert.throws(() => instance.updateConfig({ enableTestEmail: 'false' }), /boolean/);
+    assert.equal(frames.length, 1);
+    instance.destroy();
+  }
+  const { window } = setup();
+  for (const options of [{ enableTestEmail: 'false' }, { editorConfig: { enableTestEmail: 0 } }]) {
+    assert.throws(() => window.Weavour.mount('#editor', { editorKey: 'ek', userId: 'user', ...options }), /boolean/);
+  }
+});

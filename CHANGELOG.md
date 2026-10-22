@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.5
+
+- Add `enableTestEmail` to mount options, editor defaults and live configuration to hide the hosted toolbar test button.
+- Forward the React prop without remounting; keep host-owned export and delivery flows available.
+
 ## 0.1.4
 
 - Add `enableOrganizationBlocks` to mount options, editor defaults and live configuration, including React prop updates without remounting.

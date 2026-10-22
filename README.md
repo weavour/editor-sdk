@@ -91,6 +91,15 @@ off. The React wrapper also accepts `enableEmailAudit` as a live prop. A saved
 dashboard disable takes precedence over SDK preferences. Toggling preserves the
 email and undo history. This requires the matching hosted iframe support.
 
+## Test email button
+
+The toolbar test button is visible by default. Set `enableTestEmail: false` at
+mount, in `editorConfig`, or through `editor.updateConfig(...)` to hide it.
+The React wrapper accepts the same live prop. Changing visibility preserves the
+email and closes an open test dialog. This only controls the hosted editor UI;
+your application can keep its own export and delivery flow. `onTestEmail` remains
+the optional host delivery callback. Requires matching hosted iframe support.
+
 ## Identity and permissions
 
 `editorKey` is public. `userId` and optional `organizationId` are declarative
