@@ -1,16 +1,18 @@
+import type { DisplayCondition, DisplayConditionUsage, DisplayConditionIssue } from './display-conditions.js';
+export type { DisplayCondition, DisplayConditionReference, DisplayConditionUsage, DisplayConditionIssue, ConditionValues } from './display-conditions.js';
 import type { EditorTheme } from './editor-theme.js';
 import type { MergeTag, MergeTagReference, MergeTagUsage, MergeTagIssue } from './merge-tags.js';
 import type { EmailDocument } from './email-document.js';
 import type { EditorBlockId } from './editor-blocks.js';
 export type { EditorTheme, MergeTag, MergeTagReference, MergeTagUsage, MergeTagIssue, EmailDocument, EditorBlockId };
-export type EditorExport = { html: string; text: string; document: Record<string, unknown>; subject: string; preheader: string; mergeTags: MergeTagUsage[]; mergeTagIssues: MergeTagIssue[] };
+export type EditorExport = { html: string; text: string; document: Record<string, unknown>; subject: string; preheader: string; mergeTags: MergeTagUsage[]; mergeTagIssues: MergeTagIssue[]; displayConditions?: DisplayConditionUsage[]; displayConditionIssues?: DisplayConditionIssue[]; requiresConditionEvaluation?: boolean };
 export type SaveStatus = 'idle' | 'unsaved' | 'saving' | 'saved' | 'failed' | 'conflict' | 'read-only';
 export type DraftChange = { draftId: string | null; revision: number | null };
 export type SaveStatusChange = DraftChange & { status: SaveStatus };
 export type DraftSummary = { id: string; subject: string; revision: number; metadataRevision: number; hash: string; createdAt: number; updatedAt: number; archivedAt: number | null; sourceTemplateId: string | null; baseTemplateRevision: number | null };
 export type DraftFlushResult = { draft: DraftSummary | null };
-export type TestEmailRequest = { to: string; subject: string; html: string; text: string; document: Record<string, unknown> };
-export type EditorConfig = { theme?: EditorTheme; mergeTags?: MergeTag[]; locale?: string; allowedBlocks?: EditorBlockId[]; enableAi?: boolean; aiPaidOrigin?: string; enableTemplates?: boolean; enableAutosave?: boolean; enableOrganizationBlocks?: boolean; enableEmailAudit?: boolean; enableTestEmail?: boolean };
+export type TestEmailRequest = { to: string; subject: string; html: string; text: string; document: Record<string, unknown>; displayConditions?: DisplayConditionUsage[]; requiresConditionEvaluation?: boolean };
+export type EditorConfig = { theme?: EditorTheme; mergeTags?: MergeTag[]; displayConditions?: DisplayCondition[]; locale?: string; allowedBlocks?: EditorBlockId[]; enableAi?: boolean; aiPaidOrigin?: string; enableTemplates?: boolean; enableAutosave?: boolean; enableOrganizationBlocks?: boolean; enableEmailAudit?: boolean; enableTestEmail?: boolean };
 export type EditorCallbacks = {
   onReady?(): void;
   onError?(error: Error): void;

@@ -162,3 +162,19 @@ test('disabled organization blocks reject transport without fetching', async () 
   assert.equal(calls, 1);
   h.instance.destroy(); h.window.happyDOM.abort();
 });
+
+test('conditions negotiate support, update live and reject raw conditional documents', async () => {
+  const rule = { id: 'free', label: 'Free accounts', before: '{{#free}}', after: '{{/free}}' };
+  const h = setup({}, { displayConditions: [rule], editorConfig: { displayConditions: [{ ...rule, label: 'Nested' }] } });
+  assert.equal(h.config.displayConditions[0].label, 'Free accounts'); assert.equal(h.config.capabilities.displayConditionsV1, true);
+  h.send({ type: 'weavour:ready', capabilities: { applicationReady: true, displayConditionsV1: true } });
+  h.send({ type: 'weavour:application-ready' }); await h.instance.ready;
+  h.instance.updateConfig({ displayConditions: [] }); assert.deepEqual(h.sent.at(-1).config.displayConditions, []);
+  h.instance.updateConfig({ displayConditions: undefined }); assert.equal(h.sent.at(-1).config.displayConditions, undefined);
+  assert.throws(() => h.instance.updateConfig({ displayConditions: [rule, rule], locale: 'fr' }));
+  h.instance.destroy(); await h.window.happyDOM.abort();
+  const old = setup({}, { displayConditions: [rule] }); old.send({ type: 'weavour:ready', capabilities: { applicationReady: true } });
+  await assert.rejects(old.instance.ready); await old.window.happyDOM.abort();
+  assert.throws(() => setup({}, { document: { type: 'doc', content: [{ type: 'section', attrs: { displayCondition: rule } }] } }), /emailDocument/);
+  await window.happyDOM.abort();
+});

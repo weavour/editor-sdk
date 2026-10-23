@@ -1,3 +1,4 @@
+export * from './display-conditions.js';
 export { parseMergeTags, resolveMergeTags, mergeTagReferences, defaultMergeTags, safeMergeLink, validMergeToken } from './merge-tags.js';
 export { emailDocument, canonicalJson } from './email-document.js';
 export { resolveEditorTheme, readableForeground, editorSurfacePalette, colorContrast } from './editor-theme.js';

@@ -3,7 +3,7 @@ import { forwardRef, createElement, useEffect, useImperativeHandle, useRef, type
 import { mount, EditorError, type EditorInstance, type MountOptions, type EditorConfig } from '@weavour/editor';
 export type WeavourEditorProps = MountOptions & Omit<HTMLAttributes<HTMLDivElement>, keyof MountOptions | 'children'>;
 export type WeavourEditorRef = Omit<EditorInstance, 'destroy'>;
-const liveKeys = ['theme', 'locale', 'mergeTags', 'allowedBlocks', 'enableAi', 'aiPaidOrigin', 'enableTemplates', 'enableAutosave', 'enableEmailAudit', 'enableOrganizationBlocks', 'enableTestEmail'] as const;
+const liveKeys = ['theme', 'locale', 'mergeTags', 'displayConditions', 'allowedBlocks', 'enableAi', 'aiPaidOrigin', 'enableTemplates', 'enableAutosave', 'enableEmailAudit', 'enableOrganizationBlocks', 'enableTestEmail'] as const;
 const mountKeys = ['editorKey', 'userId', 'organizationId', 'document', 'emailDocument', 'subject', 'preheader', 'draftId', 'editorUrl', 'apiUrl', 'editorConfig', 'demo'] as const;
 
 /** Mount-only props require an explicit React key change to replace the session. */
@@ -41,7 +41,7 @@ export const WeavourEditor = forwardRef<WeavourEditorRef, WeavourEditorProps>(fu
     return () => { instance.destroy(); if (editor.current === instance) editor.current = null; };
   }, []);
   useEffect(() => {
-    const config: EditorConfig = { mergeTags: props.mergeTags };
+    const config: EditorConfig = { mergeTags: props.mergeTags, displayConditions: props.displayConditions };
     for (const key of liveKeys) if (Object.hasOwn(props, key)) Object.assign(config, { [key]: props[key] });
     const serialized = JSON.stringify(config);
     if (serialized !== previousLive.current) {

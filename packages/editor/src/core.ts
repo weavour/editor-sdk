@@ -1,4 +1,4 @@
-import { parseMergeTags, resolveMergeTags, emailDocument, validMessage } from './protocol.js';
+import { parseMergeTags, resolveMergeTags, emailDocument, validMessage, resolveDisplayConditions, parseDisplayConditions, inspectDisplayConditions } from './protocol.js';
 import { EditorError } from './errors.js';
 import type { MountOptions, EditorConfig, EditorSDK, EditorInstance, EditorBlockId, DraftFlushResult, SDKOptions } from './types.js';
 type Pending = { resolve(value: any): void; reject(error: Error): void; timeout: ReturnType<typeof setTimeout>; sent?: boolean };
@@ -18,7 +18,7 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
     const demo = options.demo === true;
     const demoBlocks: EditorBlockId[] = ['text', 'heading', 'button', 'divider', 'list', 'space', 'menu', 'unsubscribe', 'section', 'columns'];
     if (demo) options = { ...options, editorKey: 'ek_public_demo', userId: 'demo', draftId: undefined,
-      enableAutosave: false, enableAi: false, enableTemplates: false, enableOrganizationBlocks: false, enableTestEmail: false,
+      displayConditions: [], enableAutosave: false, enableAi: false, enableTemplates: false, enableOrganizationBlocks: false, enableTestEmail: false,
       allowedBlocks: demoBlocks.filter(block => !options.allowedBlocks || options.allowedBlocks.includes(block)) };
     for (const blocks of [options.allowedBlocks, options.editorConfig?.allowedBlocks]) {
       if (blocks !== undefined && (!Array.isArray(blocks) || blocks.some(block => typeof block !== "string"))) throw new TypeError("allowedBlocks must be an array of block names.");
@@ -57,6 +57,7 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
     }
     if (options.draftId !== undefined && (typeof options.draftId !== 'string' || !/^[a-f0-9-]{36}$/.test(options.draftId))) throw new TypeError('Invalid draft ID.');
     if (options.draftId !== undefined && (options.enableAutosave ?? options.editorConfig?.enableAutosave) === false) throw new TypeError('draftId requires autosave.');
+    if (options.emailDocument === undefined && options.document && inspectDisplayConditions(options.document).displayConditions.length) throw new TypeError('Conditional content requires emailDocument.');
     if (options.emailDocument !== undefined) {
       const full = emailDocument(options.emailDocument);
       if (options.document !== undefined || options.subject !== undefined || options.preheader !== undefined) throw new TypeError('Use emailDocument or raw document/metadata, not both.');
@@ -68,6 +69,8 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
       // A saved draft always wins; a failed resume must not save that fallback.
       options = { ...options, document: undefined, subject: undefined, preheader: undefined };
     }
+    const displayConditions = options.displayConditions ?? options.editorConfig?.displayConditions;
+    if (displayConditions !== undefined) resolveDisplayConditions([], displayConditions);
     const mergeTags = options.mergeTags ?? options.editorConfig?.mergeTags;
     if (mergeTags !== undefined) resolveMergeTags([], mergeTags);
     const url = new URL(options.editorUrl || defaultEditorUrl);
@@ -77,6 +80,7 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
     url.searchParams.set("parentOrigin", window.location.origin);
     const config: Record<string, any> = structuredClone({
       demo,
+      displayConditions: demo ? [] : displayConditions === undefined ? undefined : parseDisplayConditions(displayConditions),
       mergeTags: mergeTags === undefined ? undefined : parseMergeTags(mergeTags),
       editorKey: options.editorKey,
       draftId: options.draftId,
@@ -88,7 +92,7 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
       organizationId: options.organizationId,
       locale: options.locale || "en",
       theme: { ...options.editorConfig?.theme, ...options.theme },
-      capabilities: { organizationBlocks: !demo, testEmail: !demo && typeof options.onTestEmail === "function", changeCallback: !demo && (typeof options.onChange === "function" || typeof options.onDocumentChange === "function") },
+      capabilities: { displayConditionsV1: !demo, organizationBlocks: !demo, testEmail: !demo && typeof options.onTestEmail === "function", changeCallback: !demo && (typeof options.onChange === "function" || typeof options.onDocumentChange === "function") },
       allowedBlocks: options.allowedBlocks ?? options.editorConfig?.allowedBlocks,
       enableTemplates: options.enableTemplates ?? options.editorConfig?.enableTemplates ?? true,
       document: options.document,
@@ -118,6 +122,7 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
     let destroyed = false;
     let ready = false;
     let configured = false;
+    let conditionSupport = false;
     let autosaveReady = false;
     let autosaveEnabled = config.enableAutosave ?? true;
     let timer: ReturnType<typeof setTimeout>;
@@ -246,7 +251,11 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
         if (typeof options.onError === 'function') options.onError(new EditorError('config_failed', 'Unable to load saved editor configuration.'));
         return;
       }
-      if (message.type === 'weavour:ready') configured = true;
+      if (message.type === 'weavour:ready' && (config.displayConditions?.length || options.emailDocument?.schemaVersion === 2) && message.capabilities?.displayConditionsV1 !== true) {
+        const error = new EditorError('incompatible_editor', 'Upgrade the hosted editor to use display conditions.');
+        rejectReady(error); destroy(); options.onError?.(error); return;
+      }
+      if (message.type === 'weavour:ready') { configured = true; conditionSupport = message.capabilities?.displayConditionsV1 === true; }
       if (message.type === 'weavour:ready' && settings.readiness !== 'configured') {
         if (message.capabilities?.applicationReady !== true) {
           const error = new EditorError('incompatible_editor', 'This iframe does not support application readiness. Upgrade the hosted editor.');
@@ -387,8 +396,20 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
       if (destroyed) throw new EditorError('destroyed', "This editor has been destroyed.");
       for (const key of settings.readiness === 'configured' ? [] : ['editorKey', 'userId', 'organizationId', 'document', 'emailDocument', 'draftId']) if (next && Object.hasOwn(next, key)) throw new TypeError(key + ' is mount-only.');
       if (!next || typeof next !== "object") throw new TypeError("Configuration is required.");
-      if (demo) next = { ...next, enableAutosave: false, enableAi: false, enableTemplates: false, enableOrganizationBlocks: false, enableTestEmail: false,
+      if (demo) next = { ...next, displayConditions: [], enableAutosave: false, enableAi: false, enableTemplates: false, enableOrganizationBlocks: false, enableTestEmail: false,
         allowedBlocks: demoBlocks.filter(block => !(next.allowedBlocks ?? config.allowedBlocks) || (next.allowedBlocks ?? config.allowedBlocks).includes(block)) };
+      // Validate the complete patch before mutating any retained configuration.
+      for (const key of ['enableAutosave', 'enableOrganizationBlocks', 'enableEmailAudit', 'enableTestEmail', 'enableAi', 'enableTemplates'] as const) {
+        if (next[key] !== undefined && typeof next[key] !== 'boolean') throw new TypeError(key + ' must be a boolean.');
+      }
+      if (Object.hasOwn(next, 'mergeTags') && next.mergeTags !== undefined) resolveMergeTags([], next.mergeTags);
+      if (next.allowedBlocks !== undefined && (!Array.isArray(next.allowedBlocks) || next.allowedBlocks.some(block => typeof block !== 'string'))) throw new TypeError('allowedBlocks must be an array of block names.');
+      if (next.locale !== undefined && typeof next.locale !== 'string') throw new TypeError('locale must be a string.');
+      if (next.aiPaidOrigin !== undefined && (typeof next.aiPaidOrigin !== 'string' || new URL(next.aiPaidOrigin).origin !== next.aiPaidOrigin)) throw new TypeError('aiPaidOrigin must be an origin.');
+      const nextConditions = Object.hasOwn(next, 'displayConditions') ? next.displayConditions === undefined ? undefined : parseDisplayConditions(next.displayConditions) : config.displayConditions;
+      if (ready && nextConditions?.length && !conditionSupport) throw new EditorError('incompatible_editor', 'Upgrade the hosted editor to use display conditions.');
+      if (!validMessage({ config: { ...config, ...next, displayConditions: nextConditions } })) throw new TypeError('Editor configuration exceeds wire limits.');
+      if (Object.hasOwn(next, 'displayConditions')) config.displayConditions = nextConditions;
       if (Object.hasOwn(next, 'mergeTags')) {
         if (next.mergeTags !== undefined) resolveMergeTags([], next.mergeTags);
         config.mergeTags = next.mergeTags === undefined ? undefined : parseMergeTags(next.mergeTags);
@@ -426,7 +447,7 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
         config.theme = { ...config.theme, ...structuredClone(next.theme) };
       }
       if (next.locale) config.locale = next.locale;
-      if (ready) post({ type: "weavour:update-config", version: 1, config: { mergeTags: config.mergeTags, theme: config.theme, locale: config.locale, enableAi: config.enableAi, enableTemplates: config.enableTemplates, enableAutosave: config.enableAutosave, enableOrganizationBlocks: config.enableOrganizationBlocks, enableEmailAudit: config.enableEmailAudit, enableTestEmail: config.enableTestEmail, allowedBlocks: config.allowedBlocks } }, origin);
+      if (ready) post({ type: "weavour:update-config", version: 1, config: { displayConditions: config.displayConditions, mergeTags: config.mergeTags, theme: config.theme, locale: config.locale, enableAi: config.enableAi, enableTemplates: config.enableTemplates, enableAutosave: config.enableAutosave, enableOrganizationBlocks: config.enableOrganizationBlocks, enableEmailAudit: config.enableEmailAudit, enableTestEmail: config.enableTestEmail, allowedBlocks: config.allowedBlocks } }, origin);
     }
     function exportHTML(previewOnly = false): Promise<any> {
       if (demo) return Promise.reject(new EditorError('demo_restricted', 'Export is disabled in demo mode.'));

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.6 (unreleased)
+
+- Add named display-condition configuration, validation and live React props.
+- Preserve schema-version-2 conditional documents and negotiate iframe support.
+- Extend export/test-email result types with condition manifests and evaluation signals.
+- Validate live configuration patches before mutating retained options.
+
 ## 0.1.5
 
 - Add `enableTestEmail` to mount options, editor defaults and live configuration to hide the hosted toolbar test button.

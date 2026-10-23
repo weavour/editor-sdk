@@ -1,13 +1,18 @@
+import { inspectDisplayConditions } from './display-conditions.js';
 import { mergeTagReferences } from './merge-tags.js';
 import { TEMPLATE_PREVIEW_LIMIT } from './template-preview-limits.js';
 
 /** Persisted authored email; editor chrome and export output are separate. */
-export type EmailDocument = { schemaVersion: 1; content: Record<string, unknown>; subject: string; preheader: string; previewHtml?: string };
+export type EmailDocument = { schemaVersion: 1 | 2; content: Record<string, unknown>; subject: string; preheader: string; previewHtml?: string };
 
 export function emailDocument(value: unknown): EmailDocument {
+  try { return parseEmailDocument(value); } catch { throw new Error('invalid_document'); }
+}
+
+function parseEmailDocument(value: unknown): EmailDocument {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('invalid_document');
   const doc = value as Record<string, unknown>;
-  if (doc.schemaVersion !== 1 || typeof doc.subject !== 'string' || doc.subject.length > 200 ||
+  if (![1, 2].includes(doc.schemaVersion as number) || typeof doc.subject !== 'string' || doc.subject.length > 200 ||
       typeof doc.preheader !== 'string' || doc.preheader.length > 500 || !doc.content || typeof doc.content !== 'object' || Array.isArray(doc.content)) throw new Error('invalid_document');
   let nodes = 0;
   const visit = (value: unknown, depth: number) => {
@@ -16,6 +21,7 @@ export function emailDocument(value: unknown): EmailDocument {
     if (typeof node.type !== 'string' || !node.type || node.type.length > 100 || (node.text !== undefined && typeof node.text !== 'string')) throw new Error('invalid_document');
     if (node.type === 'doc') {
       const attrs = node.attrs as Record<string, unknown> | undefined;
+      if (attrs?.documentSchemaVersion !== undefined && ![1, 2].includes(attrs.documentSchemaVersion as number)) throw new Error('unsupported_document_version');
       if (attrs?.mergeTagReferences !== undefined) mergeTagReferences(attrs.mergeTagReferences);
     }
     if (node.type === 'mergeTag' || node.type === 'unsubscribe') {
@@ -31,8 +37,10 @@ export function emailDocument(value: unknown): EmailDocument {
   };
   if ((doc.content as Record<string, unknown>).type !== 'doc') throw new Error('invalid_document');
   visit(doc.content, 0);
+  const conditions = inspectDisplayConditions(doc.content as Record<string, unknown>);
+  if (doc.schemaVersion === 1 && (conditions.displayConditions.length || (doc.content as any).attrs?.documentSchemaVersion === 2)) throw new Error('unsupported_document_version');
   if (doc.previewHtml !== undefined && (typeof doc.previewHtml !== 'string' || doc.previewHtml.length > TEMPLATE_PREVIEW_LIMIT)) throw new Error('invalid_document');
-  return { ...(doc.previewHtml === undefined ? {} : { previewHtml: doc.previewHtml as string }), schemaVersion: 1, content: doc.content as Record<string, unknown>, subject: doc.subject, preheader: doc.preheader };
+  return { ...(doc.previewHtml === undefined ? {} : { previewHtml: doc.previewHtml as string }), schemaVersion: doc.schemaVersion as 1 | 2, content: doc.schemaVersion === 2 ? { ...doc.content as Record<string, unknown>, attrs: { ...(doc.content as any).attrs, documentSchemaVersion: 2 } } : doc.content as Record<string, unknown>, subject: doc.subject, preheader: doc.preheader };
 }
 
 
