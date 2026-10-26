@@ -49,3 +49,25 @@ test('classic bundle exposes the same bridge without npm or a framework', async 
   });
   expect(result.html).toBe('<p>Hello</p>');
 });
+
+
+test('localhost AI transport supplies the detected host origin without an SDK override', async ({ page }) => {
+  await page.goto('/tests/fixtures/host.html');
+  const hostOrigin = new URL(page.url()).origin;
+  await page.route('https://api.weavour.com/editors/ek_test/ai/capabilities?**', async route => {
+    const request = route.request();
+    const url = new URL(request.url());
+    expect(request.headers().origin).toBe(hostOrigin);
+    expect([...url.searchParams]).toEqual([['userId', 'user'], ['organizationId', 'org']]);
+    await route.fulfill({ headers: { 'Access-Control-Allow-Origin': hostOrigin }, json: { entitled: true, enabled: true } });
+  });
+  await page.evaluate(() => window.mountEditor({ apiUrl: 'https://api.weavour.com' }));
+  const frame = page.frameLocator('iframe');
+  await frame.locator('body').evaluate(() => {
+    window.addEventListener('message', event => {
+      if (event.source === parent && event.origin === location.origin && event.data.type === 'weavour:ai-result') window.aiResult = event.data;
+    });
+    window.send({ type: 'weavour:ai-request', id: 'local-ai', path: 'ai/capabilities', method: 'GET' });
+  });
+  await expect.poll(() => frame.locator('body').evaluate(() => window.aiResult?.result)).toEqual({ entitled: true, enabled: true });
+});

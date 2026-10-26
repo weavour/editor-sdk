@@ -178,3 +178,54 @@ test('conditions negotiate support, update live and reject raw conditional docum
   assert.throws(() => setup({}, { document: { type: 'doc', content: [{ type: 'section', attrs: { displayCondition: rule } }] } }), /emailDocument/);
   await window.happyDOM.abort();
 });
+
+
+test('editor mode validates mount precedence, pre-ready updates and clearing without remounting', async () => {
+  for (const [options, expected] of [[{}, undefined], [{ editorConfig: { mode: 'readonly' } }, 'readonly'], [{ editorConfig: { mode: 'readonly' }, mode: 'preview' }, 'preview']]) {
+    const h = setup({}, options);
+    assert.equal(h.config.mode, expected);
+    h.instance.updateConfig({ mode: 'previewDesktop' });
+    h.send({ type: 'weavour:application-ready' }); await h.instance.ready;
+    assert.equal(h.sent.at(-1).config.mode, 'previewDesktop');
+    for (const mode of ['edit', 'readonly', 'preview', 'previewDesktop', 'previewMobile', undefined]) {
+      h.instance.updateConfig({ mode }); assert.equal(h.sent.at(-1).config.mode, mode);
+      assert.equal(h.container.querySelector('iframe'), h.frame);
+    }
+    h.instance.updateConfig({ mode: 'readonly' });
+    assert.throws(() => h.instance.updateConfig({ mode: 'invalid', locale: 'fr' }), /mode/);
+    h.instance.updateConfig({ theme: { cornerRadius: 4 } });
+    assert.equal(h.sent.at(-1).config.mode, 'readonly'); assert.equal(h.sent.at(-1).config.locale, 'en');
+    h.instance.destroy(); await h.window.happyDOM.abort();
+  }
+  const pendingClear = setup({}, { mode: 'readonly' });
+  pendingClear.instance.updateConfig({ mode: undefined });
+  pendingClear.send({ type: 'weavour:application-ready' }); await pendingClear.instance.ready;
+  assert.equal(pendingClear.sent.at(-1).type, 'weavour:update-config');
+  assert.equal(pendingClear.sent.at(-1).config.mode, undefined);
+  pendingClear.instance.destroy(); await pendingClear.window.happyDOM.abort();
+  for (const options of [{ mode: 'invalid' }, { mode: null }, { editorConfig: { mode: false } }]) {
+    assert.throws(() => setup({}, options), /mode/); await window.happyDOM.abort();
+  }
+});
+
+
+test('AI requests use host transport without a billing-origin override and reject other frames', async () => {
+  const calls = [];
+  const h = setup({ fetch: async (url, init) => {
+    calls.push({ url: new URL(url), init });
+    return { ok: true, json: async () => ({ enabled: true }) };
+  } });
+  h.send({ type: 'weavour:application-ready' }); await h.instance.ready;
+  assert.equal(new URL(h.frame.src).searchParams.get('parentOrigin'), h.window.location.origin);
+  const message = { type: 'weavour:ai-request', id: 'ai-request', path: 'ai/capabilities', method: 'GET' };
+  h.send(message, { origin: 'https://evil.example' });
+  h.send(message, { source: h.window });
+  assert.equal(calls.length, 0);
+  h.send(message);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url.pathname, '/editors/ek_test/ai/capabilities');
+  assert.deepEqual([...calls[0].url.searchParams], [['userId', 'user']]);
+  assert.equal(calls[0].init.credentials, 'omit');
+  h.instance.destroy(); await h.window.happyDOM.abort();
+});

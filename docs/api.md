@@ -4,8 +4,8 @@
 configuration throws. `target` is an HTMLElement or selector. `editorKey` and an
 effective `userId` are required. Supplied IDs retain valid whitespace and case.
 
-Options include `organizationId`, `locale`, `theme`, `mergeTags`, `allowedBlocks`,
-`enableTemplates`, `enableAutosave`, `enableEmailAudit`, `enableTestEmail`, `enableAi`, `aiPaidOrigin`, initial raw
+Options include `mode`, `organizationId`, `locale`, `theme`, `mergeTags`, `allowedBlocks`,
+`enableTemplates`, `enableAutosave`, `enableEmailAudit`, `enableTestEmail`, `enableAi`, initial raw
 `document`/`subject`/`preheader`, `emailDocument`, `draftId`, `editorUrl`, `apiUrl`
 and `demo`. `editorConfig` provides saved defaults under explicit mount overrides.
 Local flags cannot grant server-denied permissions or paid features.
@@ -35,8 +35,8 @@ Prefer `onDocumentChange` when persisting email JSON:
 `{ schemaVersion: 1, content, subject, preheader, previewHtml? }`.
 Callbacks are distinct from hosted save acknowledgement. Exports do not save.
 
-`updateConfig` supports appearance, locale, merge tags, allowed blocks, templates,
-autosave, email audit, test button visibility, AI enablement and the paid origin used for local AI. Identity,
+`updateConfig` supports mode, appearance, locale, merge tags, allowed blocks, templates,
+autosave, email audit, test button visibility and AI enablement. Identity,
 initial content, draft ID and endpoint overrides require a new mount. Empty
 `allowedBlocks` hides all palette entries without deleting existing content.
 `mergeTags: undefined` clears embed definitions and returns to dashboard/default
@@ -63,3 +63,14 @@ The option changes editor behavior only, not exported email content.
 `editorConfig`, or through `updateConfig()` to hide the toolbar test button.
 React supports the same live prop. Hiding closes the open test dialog and leaves
 email content, export methods and host-owned delivery flows available.
+
+`mode` accepts `edit` (default), `readonly`, `preview`, `previewDesktop`, or
+`previewMobile`. `readonly` keeps the editor panes and toolbar visible with all
+controls disabled. `preview` keeps only a centered desktop/mobile switcher above
+the email. `previewDesktop` and `previewMobile` show only the corresponding email
+preview, with no chrome. Set it at mount, in `editorConfig`, or live with
+`updateConfig({ mode: 'preview' })`; React accepts the same live `mode` prop.
+Use `mode: 'edit'` (or `updateConfig({ mode: undefined })`) to restore normal
+editing. Mode changes retain content, metadata, undo history and the draft, and
+cannot override server access permissions. Non-edit modes pause autosave; returning
+to edit resumes pending saves. Export methods remain available.

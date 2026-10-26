@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.8 (2026-10-26)
+
+- Remove the AI billing-origin setting. Embedded requests use the host origin automatically; local AI coverage is resolved by the service from the editor configuration.
+
+- Add live `mode` configuration for read-only editing and desktop/mobile preview surfaces across JavaScript and React integrations.
+
+
 ## 0.1.6 (unreleased)
 
 - Add named display-condition configuration, validation and live React props.

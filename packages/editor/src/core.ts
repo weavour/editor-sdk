@@ -2,6 +2,10 @@ import { parseMergeTags, resolveMergeTags, emailDocument, validMessage, resolveD
 import { EditorError } from './errors.js';
 import type { MountOptions, EditorConfig, EditorSDK, EditorInstance, EditorBlockId, DraftFlushResult, SDKOptions } from './types.js';
 type Pending = { resolve(value: any): void; reject(error: Error): void; timeout: ReturnType<typeof setTimeout>; sent?: boolean };
+const editorModes = ['edit', 'readonly', 'preview', 'previewDesktop', 'previewMobile'];
+function validateMode(value: unknown) {
+  if (value !== undefined && (typeof value !== 'string' || !editorModes.includes(value))) throw new TypeError('Invalid editor mode.');
+}
 const mounted = new WeakSet<object>();
 export function createSDK(settings: SDKOptions = {}): EditorSDK {
   // Capture this while the classic script is executing, before mount is called.
@@ -20,6 +24,7 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
     if (demo) options = { ...options, editorKey: 'ek_public_demo', userId: 'demo', draftId: undefined,
       displayConditions: [], enableAutosave: false, enableAi: false, enableTemplates: false, enableOrganizationBlocks: false, enableTestEmail: false,
       allowedBlocks: demoBlocks.filter(block => !options.allowedBlocks || options.allowedBlocks.includes(block)) };
+    validateMode(options.mode); validateMode(options.editorConfig?.mode);
     for (const blocks of [options.allowedBlocks, options.editorConfig?.allowedBlocks]) {
       if (blocks !== undefined && (!Array.isArray(blocks) || blocks.some(block => typeof block !== "string"))) throw new TypeError("allowedBlocks must be an array of block names.");
     }
@@ -36,7 +41,6 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
       throw new TypeError("organizationId must be a non-empty string when supplied.");
     }
     if (options.enableAi !== undefined && typeof options.enableAi !== 'boolean') throw new TypeError('enableAi must be a boolean.');
-    if (options.aiPaidOrigin !== undefined && (typeof options.aiPaidOrigin !== 'string' || new URL(options.aiPaidOrigin).origin !== options.aiPaidOrigin)) throw new TypeError('aiPaidOrigin must be an origin.');
     for (const value of [options.enableTemplates, options.editorConfig?.enableTemplates]) {
       if (value !== undefined && typeof value !== "boolean") throw new TypeError("enableTemplates must be a boolean.");
     }
@@ -80,6 +84,7 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
     url.searchParams.set("parentOrigin", window.location.origin);
     const config: Record<string, any> = structuredClone({
       demo,
+      mode: options.mode ?? options.editorConfig?.mode,
       displayConditions: demo ? [] : displayConditions === undefined ? undefined : parseDisplayConditions(displayConditions),
       mergeTags: mergeTags === undefined ? undefined : parseMergeTags(mergeTags),
       editorKey: options.editorKey,
@@ -99,7 +104,6 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
       subject: options.subject,
       preheader: options.preheader,
       enableAi: (options.enableAi ?? options.editorConfig?.enableAi) !== false,
-      aiPaidOrigin: options.aiPaidOrigin
     });
     if (!validMessage({ config })) throw new TypeError('Editor configuration exceeds wire limits.');
     const iframe = document.createElement("iframe");
@@ -121,6 +125,7 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
     const instanceId = crypto.randomUUID();
     let destroyed = false;
     let ready = false;
+    let modeChanged = false;
     let configured = false;
     let conditionSupport = false;
     let autosaveReady = false;
@@ -268,7 +273,7 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
         configured = true; ready = true;
         iframe.style.visibility = 'visible';
         clearTimeout(timer);
-        if (config.allowedBlocks !== undefined || config.enableEmailAudit !== undefined || config.enableOrganizationBlocks !== undefined || config.enableTestEmail !== undefined) post({ type: 'weavour:update-config', version: 1, config: { allowedBlocks: config.allowedBlocks, enableOrganizationBlocks: config.enableOrganizationBlocks, enableEmailAudit: config.enableEmailAudit, enableTestEmail: config.enableTestEmail } }, origin);
+        if (modeChanged || config.mode !== undefined || config.allowedBlocks !== undefined || config.enableEmailAudit !== undefined || config.enableOrganizationBlocks !== undefined || config.enableTestEmail !== undefined) post({ type: 'weavour:update-config', version: 1, config: { mode: config.mode, allowedBlocks: config.allowedBlocks, enableOrganizationBlocks: config.enableOrganizationBlocks, enableEmailAudit: config.enableEmailAudit, enableTestEmail: config.enableTestEmail } }, origin);
         resolveReady();
         if (typeof options.onReady === "function") options.onReady();
       }
@@ -281,7 +286,6 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
         const timeout = setTimeout(() => controller.abort(), message.path.endsWith('/run') ? 210000 : 42000);
         const endpoint = new URL(apiOrigin + '/editors/'+encodeURIComponent(config.editorKey)+'/' + message.path);
         { endpoint.searchParams.set('userId', config.userId);if (config.organizationId !== undefined) endpoint.searchParams.set('organizationId', config.organizationId); }
-        if (config.aiPaidOrigin) endpoint.searchParams.set('localPaidOrigin', config.aiPaidOrigin);
         fetch(endpoint.href, {method:message.method,credentials:'omit',signal:controller.signal,
           headers: message.body === undefined ? {} : {'Content-Type':'application/json'},
           ...(message.body === undefined ? {} : {body:JSON.stringify(message.body)})
@@ -398,6 +402,7 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
       if (!next || typeof next !== "object") throw new TypeError("Configuration is required.");
       if (demo) next = { ...next, displayConditions: [], enableAutosave: false, enableAi: false, enableTemplates: false, enableOrganizationBlocks: false, enableTestEmail: false,
         allowedBlocks: demoBlocks.filter(block => !(next.allowedBlocks ?? config.allowedBlocks) || (next.allowedBlocks ?? config.allowedBlocks).includes(block)) };
+      validateMode(next.mode);
       // Validate the complete patch before mutating any retained configuration.
       for (const key of ['enableAutosave', 'enableOrganizationBlocks', 'enableEmailAudit', 'enableTestEmail', 'enableAi', 'enableTemplates'] as const) {
         if (next[key] !== undefined && typeof next[key] !== 'boolean') throw new TypeError(key + ' must be a boolean.');
@@ -405,10 +410,10 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
       if (Object.hasOwn(next, 'mergeTags') && next.mergeTags !== undefined) resolveMergeTags([], next.mergeTags);
       if (next.allowedBlocks !== undefined && (!Array.isArray(next.allowedBlocks) || next.allowedBlocks.some(block => typeof block !== 'string'))) throw new TypeError('allowedBlocks must be an array of block names.');
       if (next.locale !== undefined && typeof next.locale !== 'string') throw new TypeError('locale must be a string.');
-      if (next.aiPaidOrigin !== undefined && (typeof next.aiPaidOrigin !== 'string' || new URL(next.aiPaidOrigin).origin !== next.aiPaidOrigin)) throw new TypeError('aiPaidOrigin must be an origin.');
       const nextConditions = Object.hasOwn(next, 'displayConditions') ? next.displayConditions === undefined ? undefined : parseDisplayConditions(next.displayConditions) : config.displayConditions;
       if (ready && nextConditions?.length && !conditionSupport) throw new EditorError('incompatible_editor', 'Upgrade the hosted editor to use display conditions.');
       if (!validMessage({ config: { ...config, ...next, displayConditions: nextConditions } })) throw new TypeError('Editor configuration exceeds wire limits.');
+      if (Object.hasOwn(next, 'mode')) { config.mode = next.mode; modeChanged = true; }
       if (Object.hasOwn(next, 'displayConditions')) config.displayConditions = nextConditions;
       if (Object.hasOwn(next, 'mergeTags')) {
         if (next.mergeTags !== undefined) resolveMergeTags([], next.mergeTags);
@@ -430,10 +435,6 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
       if (next.enableTestEmail !== undefined) config.enableTestEmail = next.enableTestEmail;
       if (next.enableAi !== undefined && typeof next.enableAi !== 'boolean') throw new TypeError('enableAi must be a boolean.');
       if (next.enableAi !== undefined) config.enableAi = next.enableAi;
-      if (Object.hasOwn(next, 'aiPaidOrigin')) {
-        if (next.aiPaidOrigin !== undefined && (typeof next.aiPaidOrigin !== 'string' || new URL(next.aiPaidOrigin).origin !== next.aiPaidOrigin)) throw new TypeError('aiPaidOrigin must be an origin.');
-        config.aiPaidOrigin = next.aiPaidOrigin;
-      }
       if (next.enableTemplates !== undefined && typeof next.enableTemplates !== "boolean") throw new TypeError("enableTemplates must be a boolean.");
       if (next.allowedBlocks !== undefined && (!Array.isArray(next.allowedBlocks) || next.allowedBlocks.some(block => typeof block !== "string"))) throw new TypeError("allowedBlocks must be an array of block names.");
       if (next.enableTemplates !== undefined) config.enableTemplates = next.enableTemplates;
@@ -447,7 +448,7 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
         config.theme = { ...config.theme, ...structuredClone(next.theme) };
       }
       if (next.locale) config.locale = next.locale;
-      if (ready) post({ type: "weavour:update-config", version: 1, config: { displayConditions: config.displayConditions, mergeTags: config.mergeTags, theme: config.theme, locale: config.locale, enableAi: config.enableAi, enableTemplates: config.enableTemplates, enableAutosave: config.enableAutosave, enableOrganizationBlocks: config.enableOrganizationBlocks, enableEmailAudit: config.enableEmailAudit, enableTestEmail: config.enableTestEmail, allowedBlocks: config.allowedBlocks } }, origin);
+      if (ready) post({ type: "weavour:update-config", version: 1, config: { mode: config.mode, displayConditions: config.displayConditions, mergeTags: config.mergeTags, theme: config.theme, locale: config.locale, enableAi: config.enableAi, enableTemplates: config.enableTemplates, enableAutosave: config.enableAutosave, enableOrganizationBlocks: config.enableOrganizationBlocks, enableEmailAudit: config.enableEmailAudit, enableTestEmail: config.enableTestEmail, allowedBlocks: config.allowedBlocks } }, origin);
     }
     function exportHTML(previewOnly = false): Promise<any> {
       if (demo) return Promise.reject(new EditorError('demo_restricted', 'Export is disabled in demo mode.'));
