@@ -3,7 +3,8 @@
 The repository's Test workflow runs on every push and pull request, with no path
 or branch filters. It has read-only repository permission and no deployment
 credentials. Package jobs cover Node 22/24 and React 18/19; browser jobs cover
-Chromium/Firefox/WebKit at desktop/mobile widths. Public tests use mock services.
+Chromium/Firefox/WebKit at desktop/mobile widths. Public tests use mock services. Browser setup uses the upstream Ubuntu mirror and
+bounded package-download timeouts to avoid stalled runner mirrors blocking releases.
 
 For the first npm release, an owner must control the `@weavour` npm scope and
 bootstrap both public packages using npm's interactive authentication. Configure

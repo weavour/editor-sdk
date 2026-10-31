@@ -1,3 +1,4 @@
+import { customBlockDefinitions, customBlockProps, validateCustomValues, validateCustomHTML, hasCustomBlocks, CUSTOM_BLOCK_LIMITS } from './custom-blocks.js';
 import { parseMergeTags, resolveMergeTags, emailDocument, validMessage, resolveDisplayConditions, parseDisplayConditions, inspectDisplayConditions } from './protocol.js';
 import { EditorError } from './errors.js';
 import type { MountOptions, EditorConfig, EditorSDK, EditorInstance, EditorBlockId, DraftFlushResult, SDKOptions } from './types.js';
@@ -20,6 +21,8 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
     if (!options || typeof options !== "object") throw new TypeError("Mount options are required.");
     if (options.demo !== undefined && typeof options.demo !== 'boolean') throw new TypeError('demo must be a boolean.');
     const demo = options.demo === true;
+    let customRegistry = customBlockDefinitions(demo ? [] : options.customBlocks ?? options.editorConfig?.customBlocks ?? []);
+    let registryGeneration = 1;
     const demoBlocks: EditorBlockId[] = ['text', 'heading', 'button', 'divider', 'list', 'space', 'menu', 'unsubscribe', 'section', 'columns'];
     if (demo) options = { ...options, editorKey: 'ek_public_demo', userId: 'demo', draftId: undefined,
       displayConditions: [], enableAutosave: false, enableAi: false, enableTemplates: false, enableOrganizationBlocks: false, enableTestEmail: false,
@@ -61,7 +64,7 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
     }
     if (options.draftId !== undefined && (typeof options.draftId !== 'string' || !/^[a-f0-9-]{36}$/.test(options.draftId))) throw new TypeError('Invalid draft ID.');
     if (options.draftId !== undefined && (options.enableAutosave ?? options.editorConfig?.enableAutosave) === false) throw new TypeError('draftId requires autosave.');
-    if (options.emailDocument === undefined && options.document && inspectDisplayConditions(options.document).displayConditions.length) throw new TypeError('Conditional content requires emailDocument.');
+    if (options.emailDocument === undefined && options.document && (hasCustomBlocks(options.document) || inspectDisplayConditions(options.document).displayConditions.length)) throw new TypeError('Conditional content requires emailDocument.');
     if (options.emailDocument !== undefined) {
       const full = emailDocument(options.emailDocument);
       if (options.document !== undefined || options.subject !== undefined || options.preheader !== undefined) throw new TypeError('Use emailDocument or raw document/metadata, not both.');
@@ -97,7 +100,8 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
       organizationId: options.organizationId,
       locale: options.locale || "en",
       theme: { ...options.editorConfig?.theme, ...options.theme },
-      capabilities: { displayConditionsV1: !demo, organizationBlocks: !demo, testEmail: !demo && typeof options.onTestEmail === "function", changeCallback: !demo && (typeof options.onChange === "function" || typeof options.onDocumentChange === "function") },
+      customBlocks: customRegistry.registrations, customRegistryGeneration: registryGeneration,
+      capabilities: { customBlocksV1: !demo, displayConditionsV1: !demo, organizationBlocks: !demo, testEmail: !demo && typeof options.onTestEmail === "function", changeCallback: !demo && (typeof options.onChange === "function" || typeof options.onDocumentChange === "function") },
       allowedBlocks: options.allowedBlocks ?? options.editorConfig?.allowedBlocks,
       enableTemplates: options.enableTemplates ?? options.editorConfig?.enableTemplates ?? true,
       document: options.document,
@@ -127,7 +131,23 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
     let ready = false;
     let modeChanged = false;
     let configured = false;
-    let conditionSupport = false;
+    let conditionSupport = false, customSupport = false;
+    function assertCustomReader(value: unknown) {
+      if (customSupport) return;
+      const pending = [value]; let count = 0;
+      while (pending.length) {
+        const item = pending.pop();
+        if (++count > 50000) throw new Error('invalid_document');
+        if (!item || typeof item !== 'object') continue;
+        const record = item as Record<string, unknown>;
+        if (record.schemaVersion === 3 || record.documentSchemaVersion === 3 || record.type === 'customBlock') throw new Error('unsupported_document_version');
+        pending.push(...Object.values(record));
+      }
+    }
+    const customPending = new Map<string, () => void>();
+    const customQueue: (() => void)[] = [];
+    let customActive = 0;
+    function cancelCustom() { for (const cancel of customPending.values()) cancel(); customPending.clear(); customQueue.length = 0; }
     let autosaveReady = false;
     let autosaveEnabled = config.enableAutosave ?? true;
     let timer: ReturnType<typeof setTimeout>;
@@ -147,6 +167,7 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
     function destroy() {
       if (destroyed) return;
       destroyed = true;
+      cancelCustom();
       rejectReady(new EditorError('destroyed', 'Editor destroyed.'));
       clearTimeout(timer);
       for (const controller of timerRequests.values()) controller.abort();
@@ -177,6 +198,7 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
         readyPromise = new Promise<void>((resolve, reject) => { resolveReady = resolve; rejectReady = reject; });
         void readyPromise.catch(() => {});
       }
+      cancelCustom(); customSupport = false;
       generation++;
       config.sdkSessionId = instanceId + ':' + generation;
       for (const requests of [timerRequests, assetRequests, templateRequests, aiRequests, draftRequests]) { for (const controller of requests.values()) controller.abort(); requests.clear(); }
@@ -189,7 +211,11 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
         const error = new EditorError('timeout', "Editor readiness timed out."); rejectReady(error); destroy();
         options.onError?.(error);
       }, 15000);
-      post({ type: "weavour:init", version: 1, config }, origin);
+      if (customRegistry.registrations.length || options.emailDocument?.schemaVersion === 3 || options.document && hasCustomBlocks(options.document)) {
+        clearTimeout(timer);
+        timer = setTimeout(() => { const error = new EditorError('incompatible_editor', 'Upgrade the hosted editor to use custom blocks.'); rejectReady(error); destroy(); options.onError?.(error); }, 5000);
+        post({ type: 'weavour:probe-custom', version: 1 }, origin);
+      } else post({ type: "weavour:init", version: 1, config }, origin);
     }
 
     let lastDraftId: string | null = null;
@@ -198,8 +224,50 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
       const message = event.data;
       const receivingGeneration = generation;
       if (!validMessage(message) || message.version !== 1) return;
+      if (message.type === 'weavour:custom-capability' && message.customBlocksV1 === true && message.sessionId === config.sdkSessionId && !configured) { customSupport = true; post({ type: 'weavour:init', version: 1, config }, origin); return; }
+      if (['weavour:custom-render', 'weavour:custom-cancel'].includes(message.type) && message.sessionId !== config.sdkSessionId) return;
       if (settings.readiness !== 'configured' && message.type !== 'weavour:ready' && message.sessionId !== config.sdkSessionId) return;
       if (demo && !['weavour:ready', 'weavour:application-ready', 'weavour:focus-editor', 'weavour:config-error', 'weavour:config-update-error'].includes(message.type)) return;
+      if (message.type === 'weavour:custom-cancel' && typeof message.id === 'string') { customPending.get(message.id)?.(); return; }
+      if (message.type === 'weavour:custom-render' && configured && !demo && customSupport) {
+        const fields = ['id', 'nodeId', 'blockId'];
+        if (fields.some(key => typeof message[key] !== 'string' || !message[key] || message[key].length > 200) || !Number.isSafeInteger(message.blockVersion) || !Number.isSafeInteger(message.propsGeneration) || message.registryGeneration !== registryGeneration || customPending.has(message.id)) return;
+        const ids = { id: message.id, nodeId: message.nodeId, blockId: message.blockId, blockVersion: message.blockVersion, propsGeneration: message.propsGeneration, registryGeneration };
+        const respond = (value: Record<string, unknown>) => { if (!destroyed && receivingGeneration === generation && ids.registryGeneration === registryGeneration) post({ type: 'weavour:custom-result', version: 1, ...ids, ...value }); };
+        const definition = customRegistry.registrations.find(def => def.id === ids.blockId && def.version === ids.blockVersion);
+        if (!definition) { respond({ error: 'missing_custom_definition' }); return; }
+        let props;
+        try { props = validateCustomValues(message.props, definition.controls); } catch { respond({ error: 'invalid_custom_props' }); return; }
+        if (customPending.size >= CUSTOM_BLOCK_LIMITS.queue) { respond({ error: 'custom_queue_full' }); return; }
+        let settled = false;
+        let launch: (() => void) | undefined;
+        let timeout: ReturnType<typeof setTimeout> | undefined;
+        const finish = (value?: Record<string, unknown>) => {
+          if (settled) return; settled = true; clearTimeout(timeout); customPending.delete(ids.id);
+          const queued = launch ? customQueue.indexOf(launch) : -1;
+          if (queued >= 0) customQueue.splice(queued, 1);
+          if (value) respond(value);
+          queueMicrotask(() => { while (customActive < CUSTOM_BLOCK_LIMITS.concurrency && customQueue.length) customQueue.shift()!(); });
+        };
+        customPending.set(ids.id, () => finish());
+        timeout = setTimeout(() => finish({ error: 'custom_render_timeout' }), CUSTOM_BLOCK_LIMITS.timeout);
+        const callback = customRegistry.callbacks.get(ids.blockId + ':' + ids.blockVersion)!;
+        launch = () => {
+          if (settled) return; customActive++;
+          // Cancellation stops waiting, but cannot stop customer JavaScript. Keep
+          // its execution slot occupied until the callback actually settles.
+          Promise.resolve().then(() => settled ? undefined : callback(customBlockProps(props))).then(html => {
+            if (settled) return;
+            try { finish({ html: validateCustomHTML(html) }); } catch { finish({ error: 'unsupported_custom_html' }); }
+          }, () => finish({ error: 'custom_render_failed' })).finally(() => {
+            customActive--;
+            while (customActive < CUSTOM_BLOCK_LIMITS.concurrency && customQueue.length) customQueue.shift()!();
+          });
+        };
+        customQueue.push(launch);
+        while (customActive < CUSTOM_BLOCK_LIMITS.concurrency && customQueue.length) customQueue.shift()!();
+        return;
+      }
       if (message.type === 'weavour:autosave-config' && configured && typeof message.enableAutosave === 'boolean') {
         autosaveEnabled = message.enableAutosave;
         if (!autosaveEnabled) {
@@ -233,9 +301,13 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
         endpoint.searchParams.set('userId', config.userId);
         if (config.organizationId !== undefined) endpoint.searchParams.set('organizationId', config.organizationId);
         if (message.query && typeof message.query.cursor === 'string') endpoint.searchParams.set('cursor', message.query.cursor);
-        fetch(endpoint, { method: message.method, credentials:'omit', signal:controller.signal, headers: message.body === undefined ? {} : {'Content-Type':'application/json'}, ...(message.body === undefined ? {} : {body:JSON.stringify(message.body)}) })
+        fetch(endpoint, { method: message.method, credentials:'omit', signal:controller.signal, headers: { 'X-Weavour-Document-Version': customSupport ? '3' : '2', ...(message.body === undefined ? {} : {'Content-Type':'application/json'}) }, ...(message.body === undefined ? {} : {body:JSON.stringify(message.body)}) })
           .then(async response => {
             const result = await response.json();
+            if (response.ok) {
+              try { assertCustomReader(result); }
+              catch { if (!destroyed && receivingGeneration === generation) post({ type: 'weavour:draft-result', version: 1, id: message.id, error: 'unsupported_document_version', status: 409 }, origin); return; }
+            }
             if (!destroyed && receivingGeneration === generation) post({ type:'weavour:draft-result', version:1, id:message.id, ...(response.ok ? {result} : {error:result.error || 'drafts_unavailable',status:response.status,retryAfter:Number(response.headers.get('Retry-After')) || 0}) }, origin);
           }).catch(() => { if (!destroyed && receivingGeneration === generation) post({type:'weavour:draft-result',version:1,id:message.id,error:'drafts_unavailable',status:0},origin); })
           .finally(() => {clearTimeout(timeout);if (draftRequests.get(message.id) === controller) draftRequests.delete(message.id);});
@@ -256,11 +328,12 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
         if (typeof options.onError === 'function') options.onError(new EditorError('config_failed', 'Unable to load saved editor configuration.'));
         return;
       }
+      if (message.type === 'weavour:ready' && (customRegistry.registrations.length || options.emailDocument?.schemaVersion === 3 || options.document && hasCustomBlocks(options.document)) && message.capabilities?.customBlocksV1 !== true) { const error = new EditorError('incompatible_editor', 'Upgrade the hosted editor to use custom blocks.'); rejectReady(error); destroy(); options.onError?.(error); return; }
       if (message.type === 'weavour:ready' && (config.displayConditions?.length || options.emailDocument?.schemaVersion === 2) && message.capabilities?.displayConditionsV1 !== true) {
         const error = new EditorError('incompatible_editor', 'Upgrade the hosted editor to use display conditions.');
         rejectReady(error); destroy(); options.onError?.(error); return;
       }
-      if (message.type === 'weavour:ready') { configured = true; conditionSupport = message.capabilities?.displayConditionsV1 === true; }
+      if (message.type === 'weavour:ready') { customSupport = message.capabilities?.customBlocksV1 === true; configured = true; conditionSupport = message.capabilities?.displayConditionsV1 === true; }
       if (message.type === 'weavour:ready' && settings.readiness !== 'configured') {
         if (message.capabilities?.applicationReady !== true) {
           const error = new EditorError('incompatible_editor', 'This iframe does not support application readiness. Upgrade the hosted editor.');
@@ -273,7 +346,7 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
         configured = true; ready = true;
         iframe.style.visibility = 'visible';
         clearTimeout(timer);
-        if (modeChanged || config.mode !== undefined || config.allowedBlocks !== undefined || config.enableEmailAudit !== undefined || config.enableOrganizationBlocks !== undefined || config.enableTestEmail !== undefined) post({ type: 'weavour:update-config', version: 1, config: { mode: config.mode, allowedBlocks: config.allowedBlocks, enableOrganizationBlocks: config.enableOrganizationBlocks, enableEmailAudit: config.enableEmailAudit, enableTestEmail: config.enableTestEmail } }, origin);
+        if (modeChanged || config.mode !== undefined || config.allowedBlocks !== undefined || config.enableEmailAudit !== undefined || config.enableOrganizationBlocks !== undefined || config.enableTestEmail !== undefined) post({ type: 'weavour:update-config', version: 1, config: { customBlocks: config.customBlocks, customRegistryGeneration: config.customRegistryGeneration, mode: config.mode, allowedBlocks: config.allowedBlocks, enableOrganizationBlocks: config.enableOrganizationBlocks, enableEmailAudit: config.enableEmailAudit, enableTestEmail: config.enableTestEmail } }, origin);
         resolveReady();
         if (typeof options.onReady === "function") options.onReady();
       }
@@ -315,11 +388,12 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
         if (config.organizationId !== undefined) endpoint.searchParams.set('organizationId', config.organizationId);
         for (const key of ['search', 'offset', 'collection', 'tag']) if (message.query && message.query[key] !== undefined) endpoint.searchParams.set(key, String(message.query[key]));
         fetch(endpoint.href, { method: message.method, credentials: 'omit', signal: controller.signal,
-          headers: message.body === undefined ? {} : { 'Content-Type': 'application/json' },
+          headers: { 'X-Weavour-Document-Version': customSupport ? '3' : '2', ...(message.body === undefined ? {} : { 'Content-Type': 'application/json' }) },
           ...(message.body === undefined ? {} : { body: JSON.stringify(message.body) })
         }).then(async response => {
           const result = await response.json();
           if (!response.ok) throw new Error(result.error || 'templates_unavailable');
+          assertCustomReader(result);
           if (!destroyed && receivingGeneration === generation) post({ type: 'weavour:template-result', version: 1, id: message.id, result }, origin);
         }).catch(error => {
           if (!destroyed && receivingGeneration === generation) post({ type: 'weavour:template-result', version: 1, id: message.id, error: error.message || 'templates_unavailable' }, origin);
@@ -412,7 +486,12 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
       if (next.locale !== undefined && typeof next.locale !== 'string') throw new TypeError('locale must be a string.');
       const nextConditions = Object.hasOwn(next, 'displayConditions') ? next.displayConditions === undefined ? undefined : parseDisplayConditions(next.displayConditions) : config.displayConditions;
       if (ready && nextConditions?.length && !conditionSupport) throw new EditorError('incompatible_editor', 'Upgrade the hosted editor to use display conditions.');
-      if (!validMessage({ config: { ...config, ...next, displayConditions: nextConditions } })) throw new TypeError('Editor configuration exceeds wire limits.');
+      for (const key of ['enableAi','enableTemplates','enableAutosave','enableOrganizationBlocks','enableEmailAudit','enableTestEmail'] as const) if (next[key] !== undefined && typeof next[key] !== 'boolean') throw new TypeError(key + ' must be a boolean.');
+      const replacement = next.customBlocks === undefined ? undefined : customBlockDefinitions(demo ? [] : next.customBlocks);
+      if (replacement && ready && !customSupport) throw new EditorError('incompatible_editor', 'Upgrade the hosted editor to use custom blocks.');
+      const wireNext = { ...next, ...(replacement ? { customBlocks: replacement.registrations } : { customBlocks: config.customBlocks }) };
+      if (!validMessage({ config: { ...config, ...wireNext, displayConditions: nextConditions } })) throw new TypeError('Editor configuration exceeds wire limits.');
+      if (replacement) { cancelCustom(); customRegistry = replacement; registryGeneration++; config.customBlocks = replacement.registrations; config.customRegistryGeneration = registryGeneration; }
       if (Object.hasOwn(next, 'mode')) { config.mode = next.mode; modeChanged = true; }
       if (Object.hasOwn(next, 'displayConditions')) config.displayConditions = nextConditions;
       if (Object.hasOwn(next, 'mergeTags')) {
@@ -448,7 +527,7 @@ export function createSDK(settings: SDKOptions = {}): EditorSDK {
         config.theme = { ...config.theme, ...structuredClone(next.theme) };
       }
       if (next.locale) config.locale = next.locale;
-      if (ready) post({ type: "weavour:update-config", version: 1, config: { mode: config.mode, displayConditions: config.displayConditions, mergeTags: config.mergeTags, theme: config.theme, locale: config.locale, enableAi: config.enableAi, enableTemplates: config.enableTemplates, enableAutosave: config.enableAutosave, enableOrganizationBlocks: config.enableOrganizationBlocks, enableEmailAudit: config.enableEmailAudit, enableTestEmail: config.enableTestEmail, allowedBlocks: config.allowedBlocks } }, origin);
+      if (ready) post({ type: "weavour:update-config", version: 1, config: { customBlocks: config.customBlocks, customRegistryGeneration: config.customRegistryGeneration, mode: config.mode, displayConditions: config.displayConditions, mergeTags: config.mergeTags, theme: config.theme, locale: config.locale, enableAi: config.enableAi, enableTemplates: config.enableTemplates, enableAutosave: config.enableAutosave, enableOrganizationBlocks: config.enableOrganizationBlocks, enableEmailAudit: config.enableEmailAudit, enableTestEmail: config.enableTestEmail, allowedBlocks: config.allowedBlocks } }, origin);
     }
     function exportHTML(previewOnly = false): Promise<any> {
       if (demo) return Promise.reject(new EditorError('demo_restricted', 'Export is disabled in demo mode.'));

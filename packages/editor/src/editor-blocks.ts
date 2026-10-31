@@ -3,4 +3,4 @@ export const editorBlockIds = [
   'social', 'unsubscribe', 'list', 'html', 'space', 'divider', 'section', 'columns',
 ] as const;
 
-export type EditorBlockId = typeof editorBlockIds[number];
+export type EditorBlockId = typeof editorBlockIds[number] | `custom:${string}`;

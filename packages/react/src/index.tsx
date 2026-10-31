@@ -13,6 +13,7 @@ export const WeavourEditor = forwardRef<WeavourEditorRef, WeavourEditorProps>(fu
   const latest = useRef(props); latest.current = props;
   const initial = useRef<WeavourEditorProps | null>(null);
   const previousLive = useRef('');
+  const previousBlocks = useRef(props.customBlocks ?? props.editorConfig?.customBlocks);
   const active = () => { if (!editor.current) throw new EditorError('not_ready', 'Editor is not mounted.'); return editor.current; };
   useImperativeHandle(ref, () => ({
     get ready() { return active().ready; },
@@ -43,13 +44,16 @@ export const WeavourEditor = forwardRef<WeavourEditorRef, WeavourEditorProps>(fu
   useEffect(() => {
     const config: EditorConfig = { mode: props.mode ?? props.editorConfig?.mode, mergeTags: props.mergeTags, displayConditions: props.displayConditions };
     for (const key of liveKeys) if (Object.hasOwn(props, key)) Object.assign(config, { [key]: props[key] });
+    const blocks = props.customBlocks ?? props.editorConfig?.customBlocks;
+    const callbacksChanged = blocks !== previousBlocks.current;
+    if (blocks !== undefined) config.customBlocks = blocks;
     const serialized = JSON.stringify(config);
-    if (serialized !== previousLive.current) {
-      try { editor.current?.updateConfig(config); previousLive.current = serialized; }
+    if (serialized !== previousLive.current || callbacksChanged) {
+      try { editor.current?.updateConfig(config); previousLive.current = serialized; previousBlocks.current = blocks; }
       catch (error) { latest.current.onError?.(error instanceof Error ? error : new Error(String(error))); }
     }
     const first = initial.current;
-    if (first && mountKeys.some(key => JSON.stringify(props[key]) !== JSON.stringify(first[key]))) {
+    if (first && mountKeys.some(key => JSON.stringify(key === 'editorConfig' ? { ...props.editorConfig, customBlocks: undefined } : props[key]) !== JSON.stringify(key === 'editorConfig' ? { ...first.editorConfig, customBlocks: undefined } : first[key]))) {
       latest.current.onError?.(new EditorError('invalid_config', 'Mount-only props changed. Use a new React key after saving current work.'));
     }
   });

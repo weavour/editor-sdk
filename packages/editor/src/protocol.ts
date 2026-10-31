@@ -19,3 +19,5 @@ export function validMessage(value: unknown): value is Record<string, any> {
   };
   try { return visit(value, 0) && JSON.stringify(value).length <= MAX_MESSAGE_BYTES; } catch { return false; }
 }
+
+export * from './custom-blocks.js';

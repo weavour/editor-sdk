@@ -72,6 +72,17 @@ to switch identity or initial documents, after preserving current work. Callback
 changes do not recreate the iframe. Imports are SSR-safe; mounting runs on the
 client. Next.js examples use a client component boundary.
 
+## Custom block icons
+
+Custom block definitions accept optional `iconSvg`, a static SVG string with a
+`viewBox`. Its shapes follow the editor's icon color. Scripts, events, references,
+styles and embedded content are rejected (16 KiB, 128 elements, 12 levels maximum).
+Without it, the hosted palette measures `render(defaultProps)` to draw an automatic
+wireframe, reusing a matching saved snapshot when possible. Results are cached per
+registry generation; fallback icons preserve insertion when rendering fails.
+Palette rendering uses the shared renderer limits and never edits email content.
+See the repository's Custom blocks documentation for the full contract.
+
 ## Organization blocks
 
 Organization blocks are enabled by default for mounts with both `userId` and

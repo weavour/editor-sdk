@@ -1,3 +1,5 @@
+import type { AnyCustomBlockDefinition } from './custom-blocks.js';
+export type * from './custom-blocks.js';
 import type { DisplayCondition, DisplayConditionUsage, DisplayConditionIssue } from './display-conditions.js';
 export type { DisplayCondition, DisplayConditionReference, DisplayConditionUsage, DisplayConditionIssue, ConditionValues } from './display-conditions.js';
 import type { EditorTheme } from './editor-theme.js';
@@ -13,7 +15,7 @@ export type DraftSummary = { id: string; subject: string; revision: number; meta
 export type DraftFlushResult = { draft: DraftSummary | null };
 export type TestEmailRequest = { to: string; subject: string; html: string; text: string; document: Record<string, unknown>; displayConditions?: DisplayConditionUsage[]; requiresConditionEvaluation?: boolean };
 export type EditorMode = 'edit' | 'readonly' | 'preview' | 'previewDesktop' | 'previewMobile';
-export type EditorConfig = { mode?: EditorMode; theme?: EditorTheme; mergeTags?: MergeTag[]; displayConditions?: DisplayCondition[]; locale?: string; allowedBlocks?: EditorBlockId[]; enableAi?: boolean; enableTemplates?: boolean; enableAutosave?: boolean; enableOrganizationBlocks?: boolean; enableEmailAudit?: boolean; enableTestEmail?: boolean };
+export type EditorConfig = { customBlocks?: AnyCustomBlockDefinition[]; mode?: EditorMode; theme?: EditorTheme; mergeTags?: MergeTag[]; displayConditions?: DisplayCondition[]; locale?: string; allowedBlocks?: EditorBlockId[]; enableAi?: boolean; enableTemplates?: boolean; enableAutosave?: boolean; enableOrganizationBlocks?: boolean; enableEmailAudit?: boolean; enableTestEmail?: boolean };
 export type EditorCallbacks = {
   onReady?(): void;
   onError?(error: Error): void;

@@ -131,3 +131,67 @@ npm run test:browser
 ```
 
 Installing this SDK does not self-host the editor.
+
+
+### Custom blocks
+
+Pass `customBlocks: [{ id, version, label, defaultProps, controls, render }]` to
+`mount()` or the React wrapper. `render(props)` runs in your host application and
+returns an inline-styled email body fragment, synchronously or asynchronously.
+The core package has no React runtime dependency. Use `defineCustomBlock<Props>()`
+from `@weavour/editor` to preserve inference in heterogeneous arrays.
+
+Controls are `text`, `textarea`, `url`, `image`, `number`, `select`, `boolean` and
+`color`. All controls require labels and compatible defaults; image values are
+`{ src, assetId, width, height, alt }` or `null`, selected from the scoped library.
+Register exact `(id, version)` pairs, with the highest version used for insertion.
+Increment versions when renderer behavior, defaults or control semantics change;
+callback closures cannot be fingerprinted. Keep older versions to edit old nodes.
+Renderers receive detached JSON props and must finish promptly without side effects.
+Synchronous JavaScript cannot be interrupted by a timeout.
+
+`updateConfig({ customBlocks })` atomically replaces registrations; `[]` clears
+them and omission preserves them. Top-level options override `editorConfig`.
+React callback identities may change without remounting. Existing props and
+snapshots are never rewritten by a registry update. A missing definition keeps
+valid saved previews/exports but disables field editing. Reopening a current
+snapshot does not rerender that node. Definitions and callbacks are never stored.
+
+The palette automatically draws a small wireframe from the browser layout of
+`render(defaultProps)`. It reuses a matching current snapshot when available;
+otherwise opening the palette calls the renderer once per definition/registry
+generation, within the shared render limits. Palette rendering never edits the
+document. Icons are cached across theme and tab changes. Measurement loads no
+images or other network resources; missing image dimensions use a placeholder.
+If rendering or measurement fails, insertion remains available with a generic icon.
+
+Set optional `iconSvg` to override the outline and skip palette rendering:
+
+```ts
+iconSvg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 8h10M7 12h6M7 16h8"/></svg>',
+```
+
+SVG icons need a `viewBox` and static `g`, `path`, `rect`, `circle`, `ellipse`,
+`line`, `polyline` or `polygon` geometry. Paints become `currentColor` (preserving
+`none`) to follow the editor theme. Scripts, events, styles, text, external
+references, embedded content and nested SVGs are rejected. Limits: 16 KiB UTF-8,
+128 elements and 12 levels. This metadata never enters saved/exported email content.
+
+Persist complete `onDocumentChange` envelopes and reopen with `emailDocument`.
+Documents containing custom blocks require schema 3 and compatible hosted readers.
+Explicit `allowedBlocks` lists must include `custom:<id>` to enable insertion.
+Custom code transport is disabled in demo mode. Draft autosave preserves unresolved
+edits; export and reusable-copy saves require current validated output. Full-email
+AI replacement remains disabled when custom nodes are present.
+
+Limits per mount: 50 definition versions, 32 controls per version, 100 custom nodes,
+32 KiB UTF-8 props and 100 KiB HTML per node, four concurrent renders and 100 pending
+requests, 150 ms typing debounce and a five-second render timeout. Schema-3 envelopes
+have a combined 1,000,000-byte budget; API and bridge budgets also apply.
+
+The fragment policy accepts self-contained table/text/link/image markup and inline
+styles, preserving tested React Email button MSO comments. It rejects executable
+markup, global/head styles, forms, embedded frames/objects and CSS URLs. Escape
+values and use configured merge tokens and conditional layouts for personalization.
+Weavour executes no customer callbacks on the server. See `examples/custom-blocks/`
+and the hosted EN/FR/ES custom-block guides for complete examples and recovery steps.

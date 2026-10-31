@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.11 (2026-10-31)
+
+- Add optional `iconSvg` custom block metadata with bounded static SVG validation and theme-aware paints.
+- Document automatic hosted palette outlines, default-prop renderer calls, caching and fallback behavior.
+- Add framework-independent custom block definitions, typed controls and `defineCustomBlock()` inference.
+- Keep renderer callbacks in instance-local registries; negotiate custom-block support before sending definitions or schema-3 content.
+- Fence asynchronous render replies by session, node, registry and props generation; bound concurrency, queues and timeouts and clean up on destroy.
+- Preserve schema-3 JSON props and validated snapshots; export a shared strict fragment policy and typed HTML transformation helpers.
+- Support live registrations in JavaScript and React without remounting; advertise schema-3 support for hosted document transport guards.
+
+## 0.1.9 (2026-10-26)
+
+- Retry the 0.1.8 npm release with bounded browser dependency downloads and a replacement Ubuntu package mirror. SDK behavior is unchanged from 0.1.8.
+
 ## 0.1.8 (2026-10-26)
 
 - Remove the AI billing-origin setting. Embedded requests use the host origin automatically; local AI coverage is resolved by the service from the editor configuration.

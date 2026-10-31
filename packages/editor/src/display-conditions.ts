@@ -1,3 +1,4 @@
+import { hasCustomBlocks } from './custom-blocks.js';
 /** Public authoring configuration. Expressions belong to the host's sending engine. */
 export type DisplayCondition = { id: string; label: string; description?: string; category?: string; before: string; after: string };
 export type DisplayConditionReference = Pick<DisplayCondition, 'id' | 'label' | 'before' | 'after'>;
@@ -57,7 +58,8 @@ export function inspectDisplayConditions(content: Record<string, unknown>, confi
   visit(content, 'content', 0, 0);
   return { displayConditions: [...usage.values()], displayConditionIssues };
 }
-export function documentSchemaVersion(content: Record<string, unknown>): 1 | 2 {
+export function documentSchemaVersion(content: Record<string, unknown>): 1 | 2 | 3 {
+  if ((content.attrs as any)?.documentSchemaVersion === 3 || hasCustomBlocks(content)) return 3;
   return (content.attrs as Record<string, unknown> | undefined)?.documentSchemaVersion === 2 || inspectDisplayConditions(content).displayConditions.length ? 2 : 1;
 }
 export function parseConditionValues(value: unknown): ConditionValues {
