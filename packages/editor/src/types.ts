@@ -15,7 +15,7 @@ export type DraftSummary = { id: string; subject: string; revision: number; meta
 export type DraftFlushResult = { draft: DraftSummary | null };
 export type TestEmailRequest = { to: string; subject: string; html: string; text: string; document: Record<string, unknown>; displayConditions?: DisplayConditionUsage[]; requiresConditionEvaluation?: boolean };
 export type EditorMode = 'edit' | 'readonly' | 'preview' | 'previewDesktop' | 'previewMobile';
-export type EditorConfig = { customBlocks?: AnyCustomBlockDefinition[]; mode?: EditorMode; theme?: EditorTheme; mergeTags?: MergeTag[]; displayConditions?: DisplayCondition[]; locale?: string; allowedBlocks?: EditorBlockId[]; enableAi?: boolean; enableTemplates?: boolean; enableAutosave?: boolean; enableOrganizationBlocks?: boolean; enableEmailAudit?: boolean; enableTestEmail?: boolean };
+export type EditorConfig = { customBlocks?: AnyCustomBlockDefinition[]; mode?: EditorMode; theme?: EditorTheme; mergeTags?: MergeTag[]; displayConditions?: DisplayCondition[]; locale?: string; allowedBlocks?: EditorBlockId[]; enableAi?: boolean; enableTemplates?: boolean; enableAutosave?: boolean; enableOrganizationBlocks?: boolean; enableAnalytics?: boolean; enableEmailAudit?: boolean; enableTestEmail?: boolean };
 export type EditorCallbacks = {
   onReady?(): void;
   onError?(error: Error): void;

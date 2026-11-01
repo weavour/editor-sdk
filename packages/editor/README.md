@@ -140,3 +140,19 @@ npm run verify
 npx playwright install chromium firefox webkit
 npm run test:browser
 ```
+
+
+### Optional usage collection (0.1.12)
+
+`enableAnalytics` defaults to true. Pass `enableAnalytics: false` at mount or in
+`editorConfig`, call `updateConfig({ enableAnalytics: false })`, or set the React
+prop to suppress browser usage observations. This does not change operational
+counts of successfully created templates. Dashboard and website previews do not
+create embedded visits.
+
+The hosted iframe collects visible, usable edit and readonly visits, with a new
+visit after 30 minutes without activity. Hidden tabs and timers do not create
+activity. Preview mode pauses collection. Identity is scoped to the workspace
+resolved from the editor key and the supplied organization/user namespaces. Pass
+individual stable user IDs for useful people counts; an organization-only mount
+normalizes to a personal user namespace and cannot distinguish people.

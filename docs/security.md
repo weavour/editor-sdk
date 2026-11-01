@@ -22,3 +22,25 @@ configuration. API/iframe overrides must use HTTPS except explicit loopback.
 Only use integrity hashes with immutable script URLs; a changing compatibility
 alias cannot retain one fixed hash. Hosted image URLs are independent of SDK
 versions and remain stable through library/pool changes.
+
+
+## Observed usage and privacy
+
+SDK 0.1.12 can forward bounded usage observations from a compatible hosted iframe
+through `POST /editors/:editorKey/analytics/batches` using the mounted identity
+and the host application's real Origin. Visits are measurement records, never
+credentials. Requests omit cookies and cannot choose a tenant, pool, source or
+production classification. Configure your CSP connect-src to allow the API as
+for the other editor operations.
+
+Usage records contain opaque visit/observation IDs, timestamps, edit/readonly
+mode and scoped pseudonymous user identity. They contain no email content,
+subject, prompts, full page URL, IP address, keystrokes or replay. Organization
+namespaces remain available for customer filtering. The service retains compact
+usage records for 13 months; deleting the tenant removes its pseudonym key and
+analytics database. Customers should describe collection in their privacy notice.
+
+`enableAnalytics: false` suppresses browser usage collection; successful template
+creation remains an operational server count. Offline use, browser blockers, old
+SDKs and opt-outs cause coverage gaps. Observed users are unverified identities,
+not registered people or a basis for billing. Failures never block the editor.

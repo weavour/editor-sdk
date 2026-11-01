@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.12 (2026-11-01)
+
+- Negotiate the optional analyticsV1 bridge for observed embedded editor visits, independently of autosave, templates and AI.
+- Keep identity and API routing in the host SDK; send bounded batches through the customer's real application origin, without cookies.
+- Add enableAnalytics at mount, in editorConfig, through updateConfig and as a live React prop. False suppresses browser usage observations.
+- Report host visibility, fence requests by SDK mount generation and abort pending requests/listeners on destroy. Collection failures never invoke editor error callbacks.
+- Matching hosted services and iframe deployment are required for collection; older SDKs remain usable without usage observations.
+
 ## 0.1.11 (2026-10-31)
 
 - Add optional `iconSvg` custom block metadata with bounded static SVG validation and theme-aware paints.

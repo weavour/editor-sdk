@@ -32,3 +32,12 @@ release notes. A pinned script fixes SDK bytes, not the hosted service version.
 The proposed hosted versioned path is `/editor/sdk/<version>/editor.js`. It is
 available only after the private distribution release. Do not promise the path
 exists merely because the npm package or GitHub repository was published.
+
+
+### Analytics capability
+
+SDK 0.1.12 advertises `capabilities.analyticsV1`. A compatible hosted iframe
+collects only when that capability is present and `enableAnalytics !== false`.
+Older SDKs continue to edit/save/export normally without browser usage telemetry.
+Use a new mount (or React key) when changing editor or identity; duplicate
+readiness and live theme/configuration updates preserve the current visit.

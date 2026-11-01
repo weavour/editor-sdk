@@ -229,3 +229,30 @@ test('AI requests use host transport without a billing-origin override and rejec
   assert.equal(calls[0].init.credentials, 'omit');
   h.instance.destroy(); await h.window.happyDOM.abort();
 });
+
+test('analytics bridge pins identity and origin, stays independent of other features and supports opt-out', async () => {
+  const calls = [];
+  const h = setup({ fetch: async (url, init) => { calls.push({ url, init }); return { ok: true, status: 200 }; } }, { organizationId: 'org', enableAi: false, enableAutosave: false, enableTemplates: false, mode: 'readonly' });
+  assert.equal(h.config.capabilities.analyticsV1, true);
+  h.send({ type: 'weavour:ready', capabilities: { applicationReady: true } });
+  h.send({ type: 'weavour:application-ready' }); await h.instance.ready;
+  const batch = { version: 1, observations: [{ id: crypto.randomUUID(), visitId: crypto.randomUUID(), type: 'start', sequence: 0, at: Date.now(), mode: 'readonly' }] };
+  const message = { type: 'weavour:analytics-request', id: 'analytics', batch, path: 'admin', userId: 'forged' };
+  h.send(message, { origin: 'https://evil.example' }); h.send(message, { source: {} }); assert.equal(calls.length, 0);
+  h.send(message); await new Promise(resolve => setImmediate(resolve));
+  const endpoint = new URL(calls[0].url); assert.equal(endpoint.pathname, '/editors/ek_test/analytics/batches'); assert.equal(endpoint.searchParams.get('userId'), 'user'); assert.equal(endpoint.searchParams.get('organizationId'), 'org');
+  assert.equal(calls[0].init.credentials, 'omit'); assert.equal(calls[0].init.method, 'POST'); assert.deepEqual(JSON.parse(calls[0].init.body), batch);
+  assert.ok(h.sent.some(message => message.type === 'weavour:analytics-result' && message.ok));
+  h.instance.updateConfig({ enableAnalytics: false }); h.send({ ...message, id: 'disabled' }); assert.equal(calls.length, 1);
+  h.instance.updateConfig({ enableAnalytics: true, mode: 'preview' }); h.send({ ...message, id: 'preview' }); assert.equal(calls.length, 1);
+  assert.throws(() => h.instance.updateConfig({ enableAnalytics: 'false' }), /boolean/);
+  h.instance.destroy(); await h.window.happyDOM.abort();
+});
+
+test('analytics requests abort on destroy and failures never invoke editor error callbacks', async () => {
+  let signal, errors = 0;
+  const h = setup({ fetch: async (_url, init) => { signal = init.signal; return new Promise((_resolve, reject) => init.signal.addEventListener('abort', () => reject(new Error('offline')))); } }, { onError() { errors++; } });
+  h.send({ type: 'weavour:ready', capabilities: { applicationReady: true } }); h.send({ type: 'weavour:application-ready' }); await h.instance.ready;
+  h.send({ type: 'weavour:analytics-request', id: 'pending', batch: { version: 1, observations: [{}] } });
+  h.instance.destroy(); assert.equal(signal.aborted, true); await new Promise(resolve => setImmediate(resolve)); assert.equal(errors, 0); await h.window.happyDOM.abort();
+});

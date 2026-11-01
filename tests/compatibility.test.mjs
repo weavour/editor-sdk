@@ -19,6 +19,8 @@ function setup(overrides = {}) {
     removeEventListener(type, listener) { if (listeners.get(type) === listener) listeners.delete(type); }
   };
   const document = {
+    visibilityState: 'visible',
+    addEventListener() {}, removeEventListener() {},
     currentScript: { src: 'https://editor.example/editor.js' },
     querySelector(selector) { return selector === '#editor' ? container : null; },
     createElement() {
@@ -34,7 +36,7 @@ function setup(overrides = {}) {
     }
   };
   runInNewContext(sdk, {
-    window, document, HTMLElement, URL, structuredClone, crypto, AbortController, ...overrides,
+    window, document, HTMLElement, URL, structuredClone, crypto, AbortController, TextEncoder, ...overrides,
     setTimeout(callback) { const id = Symbol(); timers.set(id, callback); return id; },
     clearTimeout(id) { timers.delete(id); }
   });
